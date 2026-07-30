@@ -1,0 +1,2101 @@
+{
+  "name": "Final Cybersecurity Multi-Agent Platform (OpenRouter) — PRODUCTION",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cyber-platform",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "498409a3-d5be-4c1c-9d33-39efd141ce8c",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1008,
+        800
+      ],
+      "webhookId": "cyber-platform-main",
+      "notes": "Single entry point. POST JSON payload to /webhook/cyber-platform"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst staticData = $getWorkflowStaticData('global');\nconst now = new Date().toISOString();\nconst caseId = 'CASE-' + Date.now() + '-' + Math.floor(Math.random()*10000);\nconst incidentId = 'INC-' + Date.now();\n\nif (!staticData.executionHistory) staticData.executionHistory = [];\nif (!staticData.cases) staticData.cases = {};\n\nstaticData.cases[caseId] = {\n  case_id: caseId, incident_id: incidentId, created_at: now,\n  entities: [], threat_score: 0, memory: [], reports: {}\n};\nstaticData.executionHistory.push({ case_id: caseId, started_at: now, execution_id: $execution.id });\n\nconst input = $json.body || $json;\n\nreturn [{ json: {\n  case_id: caseId, incident_id: incidentId, timestamp: now,\n  execution_id: $execution.id, raw_input: input\n}}];\n"
+      },
+      "id": "b0290986-4916-4860-91eb-35e2f032333e",
+      "name": "Init Shared Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -800,
+        800
+      ],
+      "notes": "Creates unique case_id + incident_id per execution"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst raw = $json.raw_input;\nconst text = JSON.stringify(raw).toLowerCase();\nlet type = 'unknown';\nconst cveRegex = /cve-\\d{4}-\\d{4,7}/;\nconst ipRegex = /\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b/;\nconst hashRegex = /\\b[a-f0-9]{32,64}\\b/;\nconst urlRegex = /https?:\\/\\//;\n\nif (cveRegex.test(text)) type = 'cve';\nelse if (raw && (raw.dockerfile || raw.terraform || raw.kubernetes_yaml || raw.source_code || raw.ci_cd_yaml || raw.language)) type = 'code';\nelse if (raw && (raw.firewall_log || raw.windows_event_log || raw.linux_log || raw.syslog || raw.edr_alert || raw.siem_alert)) type = 'logs';\nelse if (hashRegex.test(text) || ipRegex.test(text) || urlRegex.test(text) || (raw && raw.ioc)) type = 'ioc';\nelse if (raw && (raw.pdf_report || raw.text_report)) type = 'report';\nelse type = 'logs';\n\nreturn [{ json: { ...$json, input_type: type } }];\n"
+      },
+      "id": "eab6d011-4716-439b-b5da-d4046000fa7c",
+      "name": "Classify Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -608,
+        800
+      ],
+      "notes": "Classifies input as logs/code/cve/ioc/report"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.input_type}}",
+                    "rightValue": "logs",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.input_type}}",
+                    "rightValue": "code",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.input_type}}",
+                    "rightValue": "cve",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "or"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.input_type}}",
+                    "rightValue": "ioc",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "or"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.input_type}}",
+                    "rightValue": "report",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": 0
+        }
+      },
+      "id": "798c7479-32a1-4fc4-88aa-2947893ad8d6",
+      "name": "Route by Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        -448,
+        752
+      ],
+      "notes": "Router: logs/report->Agent1, code->Agent3, cve/ioc->Agent5. All branches converge at Assemble Case Bundle."
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst text = JSON.stringify($json.raw_input);\nconst ips = [...new Set((text.match(/\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b/g) || []))];\nconst domains = [...new Set((text.match(/\\b(?:[a-z0-9-]+\\.)+[a-z]{2,}\\b/gi) || []))];\nconst hashes = [...new Set((text.match(/\\b[a-f0-9]{32}\\b|\\b[a-f0-9]{40}\\b|\\b[a-f0-9]{64}\\b/gi) || []))];\nconst urls = [...new Set((text.match(/https?:\\/\\/[^\\s\"']+/g) || []))];\nreturn [{ json: { ...$json, entities: { ips, domains, hashes, urls } } }];\n"
+      },
+      "id": "1522b32a-0b9e-4493-bfe1-1c3dedbbd1f9",
+      "name": "A1: Extract Entities & IOCs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        208
+      ],
+      "notes": "Regex-based entity/IOC extraction from raw input"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.virustotal.com/api/v3/ip_addresses/{{$json.entities.ips[0] || '0.0.0.0'}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "386a6b1e-2998-45a3-9152-1ae6e49949e6",
+      "name": "A1: VirusTotal Lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "p8rRYLOAdnNI7eO5",
+          "name": "virustotal"
+        }
+      },
+      "notes": "VirusTotal v3 IP lookup. Requires HTTP Header Auth credential named 'virustotal' with x-apikey header."
+    },
+    {
+      "parameters": {
+        "url": "=https://api.abuseipdb.com/api/v2/check",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "ipAddress",
+              "value": "={{$json.entities.ips[0] || '0.0.0.0'}}"
+            },
+            {
+              "name": "maxAgeInDays",
+              "value": "90"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "9731900e-732d-4e81-8cc6-c37bafcb6977",
+      "name": "A1: AbuseIPDB Lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        160
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "46aekGuf9sEuL5mE",
+          "name": "abuse"
+        }
+      },
+      "notes": "AbuseIPDB check. Requires HTTP Header Auth credential named 'abuse' with Key header."
+    },
+    {
+      "parameters": {
+        "url": "=https://otx.alienvault.com/api/v1/indicators/IPv4/{{$json.entities.ips[0] || '0.0.0.0'}}/general",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-OTX-API-KEY",
+              "value": "a6317b91ebdcecaa419dd7abca4e770bc6fea931c40c1934ca94993f38af91b5"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "a53fd5c8-48e3-4a7d-8156-c55a26108083",
+      "name": "A1: AlienVault OTX Lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        304
+      ],
+      "notes": "OTX lookup with hardcoded API key. Works out of box."
+    },
+    {
+      "parameters": {
+        "url": "=https://ipinfo.io/{{$json.entities.ips[0] || '0.0.0.0'}}/json",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "c45a32ae-2567-49eb-a742-9c0ea71e5ab2",
+      "name": "A1: IPinfo Lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        464
+      ],
+      "notes": "Free IPinfo geolocation/ASN lookup. No auth required (rate-limited)."
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "numberInputs": 4,
+        "options": {}
+      },
+      "id": "c3dab7b0-b82b-4466-b54e-e9f925912240",
+      "name": "A1: Merge Threat Intel",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        192,
+        256
+      ],
+      "notes": "Combines 4 parallel HTTP responses by position"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\nconst vt = items[0]?.json || {};\nconst abuse = items[1]?.json || {};\nconst otx = items[2]?.json || {};\nconst geo = items[3]?.json || {};\n\nlet score = 0;\nconst vtMalicious = vt?.data?.attributes?.last_analysis_stats?.malicious || 0;\nscore += Math.min(vtMalicious * 5, 40);\nconst abuseScore = abuse?.data?.abuseConfidenceScore || 0;\nscore += Math.min(abuseScore * 0.4, 40);\nconst otxPulses = (otx?.pulse_info?.count) || 0;\nscore += Math.min(otxPulses * 2, 20);\n\nscore = Math.min(Math.round(score), 100);\nlet severity = 'informational';\nif (score >= 80) severity = 'critical';\nelse if (score >= 60) severity = 'high';\nelse if (score >= 30) severity = 'medium';\nelse if (score > 0) severity = 'low';\n\nconst original = $('A1: Extract Entities & IOCs').first().json;\nreturn [{ json: { ...original, threat_intel: { virustotal: vt, abuseipdb: abuse, otx: otx, geoip: geo }, confidence: score, severity } }];\n"
+      },
+      "id": "bd823039-195a-416e-ac9b-c14700031345",
+      "name": "A1: Score & Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        256
+      ],
+      "notes": "Composite confidence score + severity from all threat-intel sources"
+    },
+    {
+      "parameters": {
+        "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "options": {}
+      },
+      "id": "29f4beab-8467-40c1-9917-0cd29f9e8dbb",
+      "name": "OpenRouter Model - SOC Triage",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        592,
+        480
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "I2kJ6aiKgy6L9ucv",
+          "name": "open router"
+        }
+      },
+      "notes": "OpenRouter Mistral 7B (free tier). Configure your OpenRouter API key in n8n credentials as 'OpenRouter' with base URL https://openrouter.ai/api/v1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a SOC Triage analyst. Case {{$json.case_id}}. Threat intel: {{JSON.stringify($json.threat_intel)}}. Computed confidence: {{$json.confidence}}, severity: {{$json.severity}}. Produce an Investigation Dossier in the required JSON schema.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a precise, evidence-driven SOC Level-2 analyst. Never invent IOCs not present in the provided data."
+        }
+      },
+      "id": "5f9b2326-4bee-4e73-a72e-7291a75a3a7c",
+      "name": "SOC Triage Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        528,
+        96
+      ],
+      "notes": "Agent 1: SOC Triage - produces Investigation Dossier"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "agent",
+              "type": "string",
+              "value": "soc_triage"
+            },
+            {
+              "name": "case_id",
+              "type": "string",
+              "value": "={{$('Init Shared Context').item.json.case_id}}"
+            },
+            {
+              "name": "dossier",
+              "type": "object",
+              "value": "={{$json.output}}"
+            },
+            {
+              "name": "investigation_completed",
+              "type": "boolean",
+              "value": true
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "17830b17-460a-43d5-83a4-f1223449f584",
+      "name": "A1: Format Dossier",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        848,
+        256
+      ],
+      "notes": "Standardizes Agent 1 output. Re-attaches case_id from Init Shared Context."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{$json.investigation_completed}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "88716570-d017-4684-891b-e047353d0149",
+      "name": "If Investigation Completed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        256
+      ],
+      "notes": "Gate: true branch -> Incident Response, false branch -> Assemble Case Bundle"
+    },
+    {
+      "parameters": {
+        "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "options": {}
+      },
+      "id": "ee40516c-6c1f-438c-b769-d0541ffdffa6",
+      "name": "OpenRouter Model - IR",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        496
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "I2kJ6aiKgy6L9ucv",
+          "name": "open router"
+        }
+      },
+      "notes": "OpenRouter Mistral 7B (free tier). Uses same 'OpenRouter' credential."
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Given this Investigation Dossier: {{JSON.stringify($json.dossier)}}, generate: response strategy, Linux/Windows/AWS/Azure/GCP/Kubernetes remediation, rollback plan, safety checklist, and playbook. Output the standard JSON schema. Do NOT set any execution flag to true — this requires human approval.",
+        "options": {
+          "systemMessage": "You are an Incident Response lead. You NEVER authorize automatic execution."
+        }
+      },
+      "id": "ac0c55ce-0b5d-4d9b-b9a2-5d5f1b3ebe52",
+      "name": "Incident Response Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        80
+      ],
+      "notes": "Agent 2: Incident Response - generates playbook"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "agent",
+              "type": "string",
+              "value": "incident_response"
+            },
+            {
+              "name": "case_id",
+              "type": "string",
+              "value": "={{$('Init Shared Context').item.json.case_id}}"
+            },
+            {
+              "name": "dossier",
+              "type": "object",
+              "value": "={{$('A1: Format Dossier').item.json.dossier}}"
+            },
+            {
+              "name": "playbook",
+              "type": "object",
+              "value": "={{$json.output}}"
+            },
+            {
+              "name": "requires_human_approval",
+              "type": "boolean",
+              "value": true
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "3b53c4b0-00e8-4dae-83b0-0fbd1c356a13",
+      "name": "A2: Require Human Approval",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1552,
+        240
+      ],
+      "notes": "Stages playbook for human approval. Re-attaches case_id and dossier."
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "limitWaitTime": true,
+        "resumeAmount": 2,
+        "resumeUnit": "seconds",
+        "options": {
+          "webhookSuffix": "approval/{{$json.case_id}}"
+        }
+      },
+      "id": "f83f2015-6551-4ce7-aa60-7cf61cc818ba",
+      "name": "Wait For Approval",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        352
+      ],
+      "webhookId": "fbfd541a-00e6-4135-9e20-94dfdf57bb4d",
+      "notes": "Waits up to 48h for human approval via webhook. GET to /webhook-wait/approval/{case_id}?approved=true|false"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst query = $json.query || {};\nconst approved = query.approved === 'true';\nconst explicitlyRejected = query.approved === 'false';\n\nconst priorContext = $('A2: Require Human Approval').item.json;\n\nreturn [{ json: {\n  case_id: priorContext.case_id,\n  dossier: priorContext.dossier,\n  playbook: priorContext.playbook,\n  approved,\n  status: approved ? 'approved' : (explicitlyRejected ? 'rejected' : 'timed_out_not_approved')\n}}];\n"
+      },
+      "id": "7b2cde0a-ba6a-4ed0-88a3-1c29d122cf1a",
+      "name": "A2: Evaluate Approval",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1984,
+        256
+      ],
+      "notes": "Reads $json.query.approved (from GET webhook), reconstructs context from prior node"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.approved}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "id": "c2204bda-bc9c-4551-9bdd-850047656345"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "470af4fd-785e-48ec-901d-bb9f5c4980c7",
+      "name": "If Approved",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2208,
+        192
+      ],
+      "notes": "True branch -> Mark Approved, False branch -> Mark Rejected"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "status",
+              "type": "string",
+              "value": "approved_pending_manual_execution"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "afcec635-7443-4dd9-a9bd-e2f26d78fcb8",
+      "name": "A2: Mark Approved",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2512,
+        224
+      ],
+      "notes": "Approved - playbook staged for manual execution"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "status",
+              "type": "string",
+              "value": "rejected_or_timed_out"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "0489622d-0ddc-49c9-9b87-3b9e1d252ee3",
+      "name": "A2: Mark Rejected",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2464,
+        512
+      ],
+      "notes": "Rejected or timed out"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst raw = $json.raw_input;\nconst code = raw.source_code || raw.dockerfile || raw.terraform || raw.kubernetes_yaml || raw.ci_cd_yaml || '';\nlet language = 'unknown';\nif (raw.dockerfile) language = 'dockerfile';\nelse if (raw.terraform) language = 'terraform';\nelse if (raw.kubernetes_yaml) language = 'kubernetes';\nelse if (raw.ci_cd_yaml) language = 'ci_cd';\nelse if (/def |import /.test(code)) language = 'python';\nelse if (/function |const |=>/.test(code)) language = 'javascript';\n\nconst secretPatterns = [\n  /aws_secret_access_key\\s*=\\s*['\"][A-Za-z0-9\\/+=]{20,}/i,\n  /api[_-]?key\\s*[:=]\\s*['\"][A-Za-z0-9]{16,}/i,\n  /-----BEGIN (RSA|EC|DSA|OPENSSH)? ?PRIVATE KEY-----/,\n  /ghp_[A-Za-z0-9]{36}/,\n  /AKIA[0-9A-Z]{16}/\n];\nconst secretsFound = secretPatterns.filter(p => p.test(code)).length;\nreturn [{ json: { ...$json, language, code, secrets_detected: secretsFound } }];\n"
+      },
+      "id": "b40859da-307b-41e3-9089-1db277ffa53f",
+      "name": "A3: Language & Secrets Scan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        800
+      ],
+      "notes": "Local language detection + regex secrets scan"
+    },
+    {
+      "parameters": {
+        "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "options": {}
+      },
+      "id": "a383693f-9389-448d-b22e-f2170d01f450",
+      "name": "OpenRouter Model - DevSecOps",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        32,
+        944
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "I2kJ6aiKgy6L9ucv",
+          "name": "open router"
+        }
+      },
+      "notes": "OpenRouter DeepSeek R1 (free tier) for deep code reasoning"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\"case_id\": \"string\", \"workflow\": \"devsecops_audit\", \"timestamp\": \"string\", \"severity\": \"critical|high|medium|low\", \"confidence\": 0, \"findings\": [\"string\"], \"recommendations\": [\"string\"], \"references\": [\"string\"], \"evidence\": {\"secrets_detected\": 0, \"owasp_top10_hits\": []}, \"ai_summary\": \"string\"}"
+      },
+      "id": "0b8e0741-8acb-4f93-95a6-a8b4984d992a",
+      "name": "A3 Audit Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        272,
+        976
+      ],
+      "notes": "Standard Code Audit Report schema output parser"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze this {{$json.language}} artifact for OWASP Top 10, dependency risk, IaC misconfigurations, and container best-practice violations. Secrets pattern hits: {{$json.secrets_detected}}. Code:\n{{$json.code}}\n\nProduce a Code Audit Report with concrete secure-code replacement snippets.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a DevSecOps engineer specializing in OWASP Top 10, IaC security and dependency risk."
+        }
+      },
+      "id": "d39d3d96-b484-4643-82d6-3547b32ebacd",
+      "name": "DevSecOps Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        96,
+        752
+      ],
+      "notes": "Agent 3: DevSecOps - produces Code Audit Report"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "agent",
+              "type": "string",
+              "value": "devsecops"
+            },
+            {
+              "name": "case_id",
+              "type": "string",
+              "value": "={{$('Init Shared Context').item.json.case_id}}"
+            },
+            {
+              "name": "audit_report",
+              "type": "object",
+              "value": "={{$json}}"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "e4af7a18-088f-4c9c-b54f-486b30498074",
+      "name": "A3: Format Audit Report",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        400,
+        800
+      ],
+      "notes": "Standardizes Agent 3 output with case_id. Output parser provides structured $json directly."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "leftValue": "={{$json.audit_report.severity}}",
+              "rightValue": "critical",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a973d986-e569-4423-a97e-2cfcd519e47b",
+      "name": "If Audit Critical",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        592,
+        800
+      ],
+      "notes": "Critical -> Compliance Agent, Non-critical -> Assemble Case Bundle"
+    },
+    {
+      "parameters": {
+        "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "options": {}
+      },
+      "id": "0b1c7a47-21c7-4ef3-9ef2-6262aca32e1c",
+      "name": "OpenRouter Model - Compliance",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        816,
+        992
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "I2kJ6aiKgy6L9ucv",
+          "name": "open router"
+        }
+      },
+      "notes": "OpenRouter Mistral 7B for compliance analysis"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Map this audit report to SOC2, ISO27001, NIST CSF, CIS Controls, PCI DSS, HIPAA and GDPR: {{JSON.stringify($json.audit_report)}}. Generate policy updates, an auditor evidence checklist, and a risk score (0-100).",
+        "options": {
+          "systemMessage": "You are a GRC/compliance analyst mapping technical findings to control frameworks."
+        }
+      },
+      "id": "9730a54d-97ed-4fcb-b0f3-eac17e421269",
+      "name": "Compliance Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        848,
+        736
+      ],
+      "notes": "Agent 4: Compliance - maps findings to regulatory frameworks"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "agent",
+              "type": "string",
+              "value": "compliance"
+            },
+            {
+              "name": "case_id",
+              "type": "string",
+              "value": "={{$('A3: Format Audit Report').item.json.case_id}}"
+            },
+            {
+              "name": "audit_report",
+              "type": "object",
+              "value": "={{$('A3: Format Audit Report').item.json.audit_report}}"
+            },
+            {
+              "name": "compliance_report",
+              "type": "object",
+              "value": "={{$json.output}}"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "a0bfd93f-a2d7-4eac-bb78-b1d0ce2db99a",
+      "name": "A4: Format Compliance",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1296,
+        752
+      ],
+      "notes": "Standardizes Agent 4 output with case_id and audit_report from A3"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst text = JSON.stringify($json.raw_input);\nconst cve = (text.match(/CVE-\\d{4}-\\d{4,7}/i) || [null])[0];\nconst hash = (text.match(/\\b[a-f0-9]{64}\\b|\\b[a-f0-9]{40}\\b|\\b[a-f0-9]{32}\\b/i) || [null])[0];\nconst url = (text.match(/https?:\\/\\/[^\\s\"']+/) || [null])[0];\nreturn [{ json: { ...$json, cve, hash, url } }];\n"
+      },
+      "id": "aee28399-7456-4b17-8278-1317df7033f2",
+      "name": "A5: Extract CVE/IOC",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        1536
+      ],
+      "notes": "Pulls CVE ID, hash, and URL from raw input"
+    },
+    {
+      "parameters": {
+        "url": "=https://services.nvd.nist.gov/rest/json/cves/2.0",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "cveId",
+              "value": "={{$json.cve}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 50000
+        }
+      },
+      "id": "05eb660f-bcd2-4a57-9231-8d3b53a4189f",
+      "name": "A5: NVD Lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        16,
+        1216
+      ],
+      "notes": "NVD REST API 2.0 - CVE details (no auth required)"
+    },
+    {
+      "parameters": {
+        "url": "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 50000
+        }
+      },
+      "id": "56a04b40-86a9-4e1b-b49d-235377baa967",
+      "name": "A5: CISA KEV Lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        1408
+      ],
+      "notes": "CISA Known Exploited Vulnerabilities catalog (no auth required)"
+    },
+    {
+      "parameters": {
+        "url": "=https://cve.circl.lu/api/cve/{{$json.cve}}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 50000
+        }
+      },
+      "id": "fb6a2a47-def1-431c-84ba-de8914e45acb",
+      "name": "A5: CIRCL CVE Lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        1568
+      ],
+      "notes": "CIRCL CVE search API (no auth required)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://mb-api.abuse.ch/api/v1/",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "get_info"
+            },
+            {
+              "name": "hash",
+              "value": "={{$json.hash}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 50000
+        }
+      },
+      "id": "cff65baa-27a4-4b23-9242-d4851174df17",
+      "name": "A5: MalwareBazaar Lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        1712
+      ],
+      "notes": "abuse.ch MalwareBazaar hash lookup (no auth required)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://urlhaus-api.abuse.ch/v1/url/",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{$json.url}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 50000
+        }
+      },
+      "id": "1e0c6ac3-523b-48c8-b7c9-1a7882f4abb6",
+      "name": "A5: URLHaus Lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        1888
+      ],
+      "notes": "abuse.ch URLHaus URL lookup (no auth required)"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "numberInputs": 5,
+        "options": {}
+      },
+      "id": "b5fd14a6-cb61-44a6-b73e-3c93087f353b",
+      "name": "A5: Merge Sources",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        256,
+        1520
+      ],
+      "notes": "Combines 5 parallel threat intel lookups by position"
+    },
+    {
+      "parameters": {
+        "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "options": {}
+      },
+      "id": "0b26a0e2-98bf-4142-9cfe-c2a241b55991",
+      "name": "OpenRouter Model - Threat Intel",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        496,
+        1648
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "I2kJ6aiKgy6L9ucv",
+          "name": "open router"
+        }
+      },
+      "notes": "OpenRouter Mistral 7B for detection rule generation"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\"case_id\": \"string\", \"workflow\": \"threat_intel\", \"timestamp\": \"string\", \"severity\": \"string\", \"confidence\": 0, \"findings\": [\"string\"], \"recommendations\": [\"string\"], \"references\": [\"string\"], \"evidence\": {\"mitre_attack\": [], \"sigma_rule\": \"string\", \"yara_rule\": \"string\", \"spl_query\": \"string\", \"kql_query\": \"string\", \"elastic_query\": \"string\"}, \"ai_summary\": \"string\"}"
+      },
+      "id": "18c5de1f-9af9-422d-ad36-664a4815e313",
+      "name": "A5 TI Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        752,
+        1632
+      ],
+      "notes": "Standard threat intel schema with detection rule fields"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Given CVE/malware/IOC context: {{JSON.stringify({cve: $json.cve, hash: $json.hash, url: $json.url})}} and merged NVD/CISA-KEV/CIRCL/MalwareBazaar/URLHaus data, produce: threat context, MITRE ATT&CK mapping, and detection rules in Sigma, Splunk SPL, Sentinel KQL, Elastic Query and YARA formats.",
+        "options": {
+          "systemMessage": "You are a threat intelligence analyst who writes precise, syntactically valid detection rules."
+        }
+      },
+      "id": "e147feca-b4cf-455c-bfc3-caa835e7f96f",
+      "name": "Threat Intelligence Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        528,
+        1424
+      ],
+      "notes": "Agent 5: Threat Intelligence - produces threat context + detection rules"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4875d08d-b193-45fe-83c3-12de78c4e856",
+              "name": "agent",
+              "value": "threat_intel",
+              "type": "string"
+            },
+            {
+              "id": "5cc3cd09-6dc4-4b26-ae63-52f2b16bdade",
+              "name": "threat_intel_report",
+              "value": "={{$json}}",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "45193c93-297b-4bb1-949b-3888dd44d655",
+      "name": "A5: Format TI Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        960,
+        1552
+      ],
+      "notes": "Standardizes Agent 5 output. Output parser provides structured $json directly."
+    },
+    {
+      "parameters": {
+        "jsCode": "function safe(nodeName, path) {\n  try {\n    const item = $(nodeName).item.json;\n    return path ? (item[path] ?? null) : item;\n  } catch (e) {\n    return null;\n  }\n}\n\nconst case_id = safe('Init Shared Context', 'case_id') || $json.case_id || null;\n\nconst bundle = {\n  case_id: case_id,\n  dossier: safe('A1: Format Dossier', 'dossier'),\n  playbook: safe('A2: Evaluate Approval', 'playbook') || safe('A2: Require Human Approval', 'playbook'),\n  approval_status: safe('A2: Evaluate Approval', 'status'),\n  audit_report: safe('A4: Format Compliance', 'audit_report') || safe('A3: Format Audit Report', 'audit_report'),\n  compliance_report: safe('A4: Format Compliance', 'compliance_report'),\n  threat_intel_report: safe('A5: Format TI Output', 'threat_intel_report')\n};\n\nreturn [{ json: bundle }];"
+      },
+      "id": "6bd24955-2487-4601-bee6-603f1f6604ec",
+      "name": "Assemble Case Bundle",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2256,
+        912
+      ],
+      "notes": "Gathers whichever branch actually ran into one object. try/catch expected for branches that didn't run."
+    },
+    {
+      "parameters": {
+        "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "options": {}
+      },
+      "id": "61ce1b19-9b6d-4982-8ac5-d8f58c8d29fe",
+      "name": "OpenRouter Model - Executive",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        2448,
+        1104
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "I2kJ6aiKgy6L9ucv",
+          "name": "open router"
+        }
+      },
+      "notes": "OpenRouter Mistral 7B (free tier). Uses same 'OpenRouter' credential."
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an executive cybersecurity advisor. Create a comprehensive executive briefing for case {{ $json.case_id }}.\n\nCONTEXT:\n- Threat Intel Report: {{ JSON.stringify($json.threat_intel_report) }}\n- Dossier: {{ $json.dossier ? JSON.stringify($json.dossier) : \"Not applicable for this run\" }}\n- Audit Report: {{ $json.audit_report ? JSON.stringify($json.audit_report) : \"Not applicable for this run\" }}\n- Compliance Report: {{ $json.compliance_report ? JSON.stringify($json.compliance_report) : \"Not applicable for this run\" }}\n- Playbook: {{ $json.playbook ? JSON.stringify($json.playbook) : \"Not applicable for this run\" }}\n- Approval Status: {{ $json.approval_status || \"Pending\" }}\n\nProduce the following executive deliverables in STRICT JSON format. Do NOT output markdown, explanations, or any text outside the JSON structure.\n\n{\n  \"CEO_report\": \"2-3 paragraph executive summary for CEO focusing on business risk and strategic implications\",\n  \"Board_report\": \"Formal board briefing covering governance, compliance, and strategic risk posture\",\n  \"Technical_report\": \"Concise technical summary for CISO/CTO with specific remediation timeline\",\n  \"Risk_summary\": \"Bullet-point risk assessment with likelihood/impact matrix\",\n  \"Business_impact\": \"Analysis of potential financial, operational, and reputational impacts\",\n  \"Executive_recommendations\": \"Numbered list of top 3-5 strategic recommendations with priority and estimated effort\"\n}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You translate technical security findings into clear business risk language for executives and boards. Focus on:\n- Business impact over technical details\n- Strategic recommendations with clear priorities\n- Actionable insights with estimated effort/timeline\n- Risk quantification where possible\n- Avoid technical jargon; use plain business language"
+        }
+      },
+      "id": "1690c981-402a-4cf2-aa6b-d3b84b583101",
+      "name": "Executive Reporting Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        2512,
+        912
+      ],
+      "notes": "Agent 6: Executive Reporting - produces CEO/Board/Technical reports"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst bundle = $('Assemble Case Bundle').item.json;\nconst execOutput = $json;  // Output parser provides structured $json directly\n\nconst staticData = $getWorkflowStaticData('global');\nconst caseId = bundle.case_id;\nconst started = staticData.cases && staticData.cases[caseId] ? staticData.cases[caseId].created_at : new Date().toISOString();\nconst latencyMs = new Date() - new Date(started);\n\nconst finalCase = {\n  case_id: caseId,\n  workflow: 'cyber_multiagent_platform',\n  timestamp: new Date().toISOString(),\n  severity: (bundle.dossier && bundle.dossier.severity) || (bundle.audit_report && bundle.audit_report.severity) || (bundle.threat_intel_report && bundle.threat_intel_report.severity) || 'informational',\n  confidence: (bundle.dossier && bundle.dossier.confidence) || (bundle.threat_intel_report && bundle.threat_intel_report.confidence) || 0,\n  findings: [].concat(\n    (bundle.dossier && bundle.dossier.findings) || [],\n    (bundle.audit_report && bundle.audit_report.findings) || [],\n    (bundle.threat_intel_report && bundle.threat_intel_report.findings) || []\n  ),\n  recommendations: execOutput.Executive_recommendations || [],\n  references: [],\n  evidence_json: JSON.stringify({\n    dossier: bundle.dossier,\n    audit_report: bundle.audit_report,\n    compliance_report: bundle.compliance_report,\n    threat_intel_report: bundle.threat_intel_report,\n    playbook: bundle.playbook,\n    approval_status: bundle.approval_status,\n    executive_report: execOutput  // Include full executive report\n  }),\n  ai_summary: execOutput.ai_summary || execOutput.CEO_report || '',\n  execution_id: $execution.id,\n  latency_ms: latencyMs\n};\n\nif (staticData.cases && staticData.cases[caseId]) {\n  staticData.cases[caseId].reports.final = finalCase;\n}\n\nreturn [{ json: finalCase }];\n"
+      },
+      "id": "ef45e7f9-3832-4408-ba14-5a738796c9d1",
+      "name": "Build Final Case JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2880,
+        960
+      ],
+      "notes": "Assembles final standardized output. Reads executive output directly from $json (output parser)."
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1gFhpMj7CghAAd6FH53T_Dblv0VCGvJ-eEkMkV4jsvgw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Cases",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "case_id": "={{ $json.case_id }}",
+            "timestamp": "={{ $json.timestamp }}",
+            "severity": "={{ $json.severity }}",
+            "confidence": "={{ $json.confidence }}",
+            "execution_id": "={{ $json.execution_id }}",
+            "latency_ms": "={{ $json.latency_ms }}",
+            "workflow": "={{ $json.workflow }}",
+            "findings": "={{ $json.findings }}",
+            "recommendations": "={{ $json.recommendations }}",
+            "references": "={{ $json.references }}",
+            "evidence": "={{ $json.evidence_json }}",
+            "ai_summary": "={{ $json.ai_summary }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "case_id",
+              "displayName": "case_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "severity",
+              "displayName": "severity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "latency_ms",
+              "displayName": "latency_ms",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "findings",
+              "displayName": "findings",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "recommendations",
+              "displayName": "recommendations",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "references",
+              "displayName": "references",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "evidence",
+              "displayName": "evidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ai_summary",
+              "displayName": "ai_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "8d7ea348-d1fe-4dde-8f39-f00fc854fe21",
+      "name": "Log to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        3152,
+        976
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1YJ7n4r2s3FXebDv",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Logs final case data to Google Sheets. Requires OAuth2 credential named 'Google Sheets'."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}",
+        "options": {}
+      },
+      "id": "f23caab1-ed0b-4b56-aba7-6be7cb958222",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        3392,
+        976
+      ],
+      "notes": "Terminal node - returns final case JSON to the webhook caller"
+    },
+    {
+      "parameters": {},
+      "id": "7bfb93c5-fca0-4666-ae6b-90c2f86068b5",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -800,
+        2000
+      ],
+      "notes": "Fires on any node failure in this workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nreturn [{ json: {\n  execution_id: $execution.id,\n  workflow: $workflow.name,\n  failed_node: $json.execution ? $json.execution.lastNodeExecuted : ($json.node ? $json.node.name : 'unknown'),\n  error_message: $json.execution ? $json.execution.error?.message : ($json.error ? $json.error.message : JSON.stringify($json)),\n  timestamp: new Date().toISOString()\n}}];\n"
+      },
+      "id": "4033217b-f868-4ba5-bca0-6293611b92f6",
+      "name": "Format Error Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -608,
+        2000
+      ],
+      "notes": "Normalizes error payload for logging"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1gFhpMj7CghAAd6FH53T_Dblv0VCGvJ-eEkMkV4jsvgw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Errors",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "execution_id": "={{$json.execution_id}}",
+            "workflow": "={{$json.workflow}}",
+            "failed_node": "={{$json.failed_node}}",
+            "error_message": "={{$json.error_message}}",
+            "timestamp": "={{$json.timestamp}}"
+          }
+        },
+        "options": {}
+      },
+      "id": "a770753c-0454-48e9-b32b-6c89c3910243",
+      "name": "Log Error to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        -400,
+        2112
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1YJ7n4r2s3FXebDv",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Logs errors to Google Sheets Errors tab"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Init Shared Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Init Shared Context": {
+      "main": [
+        [
+          {
+            "node": "Classify Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Input": {
+      "main": [
+        [
+          {
+            "node": "Route by Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Type": {
+      "main": [
+        [
+          {
+            "node": "A1: Extract Entities & IOCs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "A3: Language & Secrets Scan",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "A5: Extract CVE/IOC",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "A5: Extract CVE/IOC",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "A1: Extract Entities & IOCs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A1: Extract Entities & IOCs": {
+      "main": [
+        [
+          {
+            "node": "A1: VirusTotal Lookup",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "A1: AbuseIPDB Lookup",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "A1: AlienVault OTX Lookup",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "A1: IPinfo Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A1: VirusTotal Lookup": {
+      "main": [
+        [
+          {
+            "node": "A1: Merge Threat Intel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A1: AbuseIPDB Lookup": {
+      "main": [
+        [
+          {
+            "node": "A1: Merge Threat Intel",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "A1: AlienVault OTX Lookup": {
+      "main": [
+        [
+          {
+            "node": "A1: Merge Threat Intel",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "A1: IPinfo Lookup": {
+      "main": [
+        [
+          {
+            "node": "A1: Merge Threat Intel",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "A1: Merge Threat Intel": {
+      "main": [
+        [
+          {
+            "node": "A1: Score & Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A1: Score & Normalize": {
+      "main": [
+        [
+          {
+            "node": "SOC Triage Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Model - SOC Triage": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "SOC Triage Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SOC Triage Agent": {
+      "main": [
+        [
+          {
+            "node": "A1: Format Dossier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A1: Format Dossier": {
+      "main": [
+        [
+          {
+            "node": "If Investigation Completed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Investigation Completed": {
+      "main": [
+        [
+          {
+            "node": "Incident Response Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Assemble Case Bundle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Model - IR": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Incident Response Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Incident Response Agent": {
+      "main": [
+        [
+          {
+            "node": "A2: Require Human Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A2: Require Human Approval": {
+      "main": [
+        [
+          {
+            "node": "Wait For Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Approval": {
+      "main": [
+        [
+          {
+            "node": "A2: Evaluate Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A2: Evaluate Approval": {
+      "main": [
+        [
+          {
+            "node": "If Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Approved": {
+      "main": [
+        [
+          {
+            "node": "A2: Mark Approved",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "A2: Mark Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A3: Language & Secrets Scan": {
+      "main": [
+        [
+          {
+            "node": "DevSecOps Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Model - DevSecOps": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "DevSecOps Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A3 Audit Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "DevSecOps Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DevSecOps Agent": {
+      "main": [
+        [
+          {
+            "node": "A3: Format Audit Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A3: Format Audit Report": {
+      "main": [
+        [
+          {
+            "node": "If Audit Critical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Audit Critical": {
+      "main": [
+        [
+          {
+            "node": "Compliance Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Assemble Case Bundle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Model - Compliance": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Compliance Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compliance Agent": {
+      "main": [
+        [
+          {
+            "node": "A4: Format Compliance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A5: Extract CVE/IOC": {
+      "main": [
+        [
+          {
+            "node": "A5: NVD Lookup",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "A5: CISA KEV Lookup",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "A5: CIRCL CVE Lookup",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "A5: MalwareBazaar Lookup",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "A5: URLHaus Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A5: NVD Lookup": {
+      "main": [
+        [
+          {
+            "node": "A5: Merge Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A5: CISA KEV Lookup": {
+      "main": [
+        [
+          {
+            "node": "A5: Merge Sources",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "A5: CIRCL CVE Lookup": {
+      "main": [
+        [
+          {
+            "node": "A5: Merge Sources",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "A5: MalwareBazaar Lookup": {
+      "main": [
+        [
+          {
+            "node": "A5: Merge Sources",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "A5: URLHaus Lookup": {
+      "main": [
+        [
+          {
+            "node": "A5: Merge Sources",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "A5: Merge Sources": {
+      "main": [
+        [
+          {
+            "node": "Threat Intelligence Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Model - Threat Intel": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Threat Intelligence Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A5 TI Parser": {
+      "ai_outputParser": [
+        []
+      ]
+    },
+    "Threat Intelligence Agent": {
+      "main": [
+        [
+          {
+            "node": "A5: Format TI Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A2: Mark Approved": {
+      "main": [
+        [
+          {
+            "node": "Assemble Case Bundle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A2: Mark Rejected": {
+      "main": [
+        [
+          {
+            "node": "Assemble Case Bundle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A4: Format Compliance": {
+      "main": [
+        [
+          {
+            "node": "Assemble Case Bundle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A5: Format TI Output": {
+      "main": [
+        [
+          {
+            "node": "Assemble Case Bundle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble Case Bundle": {
+      "main": [
+        [
+          {
+            "node": "Executive Reporting Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Model - Executive": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Executive Reporting Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Executive Reporting Agent": {
+      "main": [
+        [
+          {
+            "node": "Build Final Case JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Final Case JSON": {
+      "main": [
+        [
+          {
+            "node": "Log to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Error Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error Log": {
+      "main": [
+        [
+          {
+            "node": "Log Error to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "6f859734-d4b9-4667-a16d-83f4452ebfa2",
+  "meta": {
+    "instanceId": "31b464be558e9fc34aafd78d928e50763698246c7544ab49e2fac5bd58403993"
+  },
+  "nodeGroups": [],
+  "id": "Lllx5zIR3CjINwkv",
+  "tags": []
+}
