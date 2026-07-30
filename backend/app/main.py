@@ -38,6 +38,13 @@ async def lifespan(app: FastAPI):
     await init_db()
     log.info("database_initialized")
 
+    try:
+        from app.services.agent_docs import ensure_all_agent_pdfs_generated
+        ensure_all_agent_pdfs_generated()
+        log.info("agent_docs_pdfs_generated")
+    except Exception as e:
+        log.warning("agent_docs_generation_warning", error=str(e))
+
     yield
 
     log.info("sentinel_ai_shutdown")

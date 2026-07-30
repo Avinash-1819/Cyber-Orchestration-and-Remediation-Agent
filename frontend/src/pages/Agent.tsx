@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Send, Square, Shield, Zap, CheckCircle, XCircle, Clock, Download, Loader2,
-  Bug, ChevronDown, ChevronUp, LayoutGrid, MessageSquare
+  Bug, ChevronDown, ChevronUp, LayoutGrid
 } from 'lucide-react';
 
 const API = 'http://localhost:8000/api/v1';
@@ -265,10 +266,35 @@ function MessageBubble({ msg, token }: { msg: Message; token: string | null }) {
         <Shield className="w-4 h-4 text-purple-300" />
       </div>
       <div className="flex-1 min-w-0">
-        {msg.status === 'thinking' && (
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs text-purple-400 font-mono">CORE is analyzing</span>
-            <span className="flex gap-0.5"><span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" /></span>
+        {(msg.status === 'thinking' || msg.status === 'streaming') && (!msg.content || msg.content.length === 0) && (
+          <div className="glass rounded-xl p-3.5 mb-3 border border-purple-500/50 shadow-lg shadow-purple-950/40 animate-pulse">
+            <div className="flex items-center gap-2.5 mb-2">
+              <div className="w-6 h-6 rounded-lg bg-purple-600/40 border border-purple-500/60 flex items-center justify-center shrink-0">
+                <Loader2 className="w-3.5 h-3.5 text-purple-300 animate-spin" />
+              </div>
+              <div className="flex-1">
+                <div className="text-xs font-mono font-semibold text-purple-300">
+                  CORE MULTI-AGENT ENGINE ANALYZING...
+                </div>
+                <div className="text-[10px] text-zinc-400">
+                  Classifying payload & executing specialized security agents
+                </div>
+              </div>
+            </div>
+            <div className="space-y-1.5 pt-2 border-t border-zinc-800/80 text-[11px] font-mono">
+              <div className="flex items-center gap-2 text-emerald-400">
+                <CheckCircle className="w-3 h-3" />
+                <span>Input Ingested & Sanitized</span>
+              </div>
+              <div className="flex items-center gap-2 text-purple-300 animate-pulse">
+                <Loader2 className="w-3 h-3 animate-spin text-purple-400" />
+                <span>Executing Orchestrator Pipeline Analysis...</span>
+              </div>
+              <div className="flex items-center gap-2 text-zinc-500">
+                <Clock className="w-3 h-3" />
+                <span>Compiling Security Findings & Executive PDF/Markdown Report...</span>
+              </div>
+            </div>
           </div>
         )}
 
@@ -403,24 +429,13 @@ export default function Agent() {
   const [messages, setMessages] = useState<Message[]>([{
     id: 'welcome',
     role: 'assistant',
-    content: `Welcome to **CORE** — Cyber Orchestration and Remediation Engine.
+    content: `Hello! I am **CORE**, your autonomous AI cybersecurity assistant.
 
-I'm your autonomous multi-agent AI security platform powered by **6 specialized agents**:
-
-| Agent | Capability |
-|---|---|
-| 🔍 Incident Triage | Parse logs, extract IOCs, VirusTotal/Shodan enrichment |
-| ⚡ Remediation | Generate containment playbooks & mitigation commands |
-| 🛡️ DevSecOps | SAST, secret detection, Dockerfile & Terraform audits |
-| 📋 Compliance | ISO 27001, SOC 2, NIST SP 800-53, PCI DSS 4.0 mapping |
-| 🧠 Threat Intel | NVD CVE lookup, MITRE ATT&CK, Sigma/YARA rule generation |
-| 📊 Exec Reporting | PDF, Markdown & JSON security report generation |
-
-**Auto Mode** — paste any security data and I classify + route automatically.
-**Scanner Mode** — click the grid icon below to select a specific scanner or agent.`,
+How can I help you today? You can ask me general cybersecurity questions, or paste security logs, source code, Dockerfiles, Terraform configs, or CVE IDs for automated multi-agent analysis.`,
     ts: Date.now(),
     status: 'done',
   }]);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [input, setInput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [token, setToken] = useState<string | null>(localStorage.getItem('core_token'));
@@ -431,6 +446,20 @@ I'm your autonomous multi-agent AI security platform powered by **6 specialized 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+  useEffect(() => {
+    const sId = searchParams.get('scanner');
+    if (sId && sId !== 'auto') {
+      const found = SERVICES.find(s => s.id === sId);
+      if (found) {
+        setSelectedService(found);
+        setInput(found.example);
+      }
+    } else if (sId === 'auto') {
+      setSelectedService(null);
+      setInput('');
+    }
+  }, [searchParams]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
@@ -469,14 +498,35 @@ I'm your autonomous multi-agent AI security platform powered by **6 specialized 
 
   const fetchFinalState = async (aiId: string, sid: string, tk: string) => {
     try {
-      const [stateRes, findingsRes] = await Promise.all([
-        fetch(`${API}/sessions/${sid}`, { headers: { Authorization: `Bearer ${tk}` } }),
-        fetch(`${API}/incidents/${sid}/findings`, { headers: { Authorization: `Bearer ${tk}` } }),
-      ]);
-      const state = stateRes.ok ? await stateRes.json() : null;
-      const findingsData = findingsRes.ok ? await findingsRes.json() : null;
-      const findings = findingsData?.findings || [];
-      const s = state?.state || {};
+      let attempts = 0;
+      let state: any = null;
+      let s: any = {};
+      let findings: any[] = [];
+
+      // Poll up to 6 times (max 3.6s) to ensure background DB commit completes
+      while (attempts < 6) {
+        const [stateRes, findingsRes] = await Promise.all([
+          fetch(`${API}/sessions/${sid}`, { headers: { Authorization: `Bearer ${tk}` } }),
+          fetch(`${API}/incidents/${sid}/findings`, { headers: { Authorization: `Bearer ${tk}` } }),
+        ]);
+        state = stateRes.ok ? await stateRes.json() : null;
+        const findingsData = findingsRes.ok ? await findingsRes.json() : null;
+        s = state?.state || {};
+
+        // Merge findings from findings API and internal state object
+        const apiFindings = findingsData?.findings || [];
+        const stateFindings = s.findings || [];
+        findings = apiFindings.length > 0 ? apiFindings : stateFindings;
+
+        // If completed or findings already present, stop polling
+        if ((state?.status === 'completed' || state?.status === 'failed') && (findings.length > 0 || attempts >= 2)) {
+          break;
+        }
+
+        attempts++;
+        await new Promise(r => setTimeout(r, 600));
+      }
+
       const es = s.executive_summary || {};
 
       let content = '';
@@ -491,8 +541,10 @@ I'm your autonomous multi-agent AI security platform powered by **6 specialized 
 
       if (findings.length > 0) {
         content += `**Risk Summary:** ${crit > 0 ? `🔴 ${crit} Critical  ` : ''}${high > 0 ? `🟠 ${high} High  ` : ''}${med > 0 ? `🟡 ${med} Medium  ` : ''}— **${findings.length} total findings**`;
-      } else {
+      } else if (state?.status === 'completed') {
         content += '✅ **No security issues detected.** Analysis completed cleanly.';
+      } else {
+        content += '✅ **Analysis completed.**';
       }
 
       if (es.recommendations?.length) {
@@ -512,8 +564,22 @@ I'm your autonomous multi-agent AI security platform powered by **6 specialized 
     setInput('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
-    const isCustom = !!selectedService;
-    const agentsToRun = selectedService?.agents;
+    // Check enabled agents from sidebar
+    let enabledAgentMap: Record<string, boolean> = {};
+    try {
+      const saved = localStorage.getItem('core_enabled_agents');
+      if (saved) enabledAgentMap = JSON.parse(saved);
+    } catch {}
+
+    const disabledAgents = Object.entries(enabledAgentMap).filter(([_, enabled]) => !enabled).map(([id]) => id);
+    const hasDisabledAgents = disabledAgents.length > 0;
+
+    let isCustom = !!selectedService || hasDisabledAgents;
+    let agentsToRun = selectedService?.agents;
+
+    if (hasDisabledAgents && !agentsToRun) {
+      agentsToRun = Object.entries(enabledAgentMap).filter(([_, enabled]) => enabled).map(([id]) => id);
+    }
 
     const userMsg: Message = {
       id: `u-${Date.now()}`, role: 'user', content: text, ts: Date.now(),
@@ -536,7 +602,7 @@ I'm your autonomous multi-agent AI security platform powered by **6 specialized 
         input: text,
         input_type_hint: selectedService?.hint || undefined,
       };
-      if (isCustom && agentsToRun) {
+      if (isCustom && agentsToRun && agentsToRun.length > 0) {
         body.mode = 'custom';
         body.selected_agents = agentsToRun;
       } else {
@@ -578,6 +644,7 @@ I'm your autonomous multi-agent AI security platform powered by **6 specialized 
       const ws = new WebSocket(`${WS_BASE}/ws/${sid}?token=${tk}`);
       wsRef.current = ws;
       let agentNames: string[] = [];
+      let finalFetched = false;
 
       ws.onmessage = (ev) => {
         try {
@@ -602,6 +669,7 @@ I'm your autonomous multi-agent AI security platform powered by **6 specialized 
               updates.agents = (m.agents || []).map(a =>
                 a.name === event.agent ? { ...a, status: 'done' as const, findings: event.finding_count } : a);
               if (event.agent === 'ExecReportingAgent') {
+                finalFetched = true;
                 ws.close();
                 fetchFinalState(aiId, sid, tk!);
               }
@@ -614,11 +682,23 @@ I'm your autonomous multi-agent AI security platform powered by **6 specialized 
         } catch { }
       };
 
-      ws.onerror = () => {
-        updateMessage(aiId, { status: 'error', content: '⚠️ WebSocket connection error.' });
+      const fallbackFetch = () => {
         setIsRunning(false);
+        if (!finalFetched) {
+          finalFetched = true;
+          fetchFinalState(aiId, sid, tk!);
+        }
       };
-      ws.onclose = () => { setIsRunning(false); };
+
+      ws.onerror = () => { fallbackFetch(); };
+      ws.onclose = () => { fallbackFetch(); };
+
+      // Safety timeout: fetch final state after 15s if WS is quiet
+      setTimeout(() => {
+        if (!finalFetched) {
+          fallbackFetch();
+        }
+      }, 15000);
 
     } catch (err: any) {
       updateMessage(aiId, {
@@ -630,6 +710,7 @@ I'm your autonomous multi-agent AI security platform powered by **6 specialized 
   }, [input, isRunning, selectedService, getToken, updateMessage]);
 
   const handleServiceSelect = (service: typeof SERVICES[0]) => {
+    setSearchParams({ scanner: service.id });
     setSelectedService(service);
     setShowServiceSelector(false);
     setInput(service.example);
@@ -637,6 +718,7 @@ I'm your autonomous multi-agent AI security platform powered by **6 specialized 
   };
 
   const clearService = () => {
+    setSearchParams({});
     setSelectedService(null);
     setInput('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
@@ -658,37 +740,41 @@ I'm your autonomous multi-agent AI security platform powered by **6 specialized 
   return (
     <div className="flex flex-col h-full">
       {/* Mode toggle header */}
-      <div className="border-b border-zinc-800/60 bg-[#0d0d14]/80 px-4 py-2 flex items-center gap-3">
-        <div className="flex items-center gap-2 bg-zinc-800/60 rounded-lg p-1">
-          <button
-            onClick={clearService}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-              !selectedService ? 'bg-purple-700 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}
+      <div className="border-b border-zinc-800/60 bg-[#0d0d14]/80 px-4 py-2.5 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <label className="text-xs font-mono text-zinc-400 shrink-0 flex items-center gap-1.5">
+            <LayoutGrid className="w-3.5 h-3.5 text-purple-400" />
+            Scanner Mode:
+          </label>
+          <select
+            value={selectedService?.id || 'auto'}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === 'auto') {
+                clearService();
+              } else {
+                const found = SERVICES.find(s => s.id === val);
+                if (found) handleServiceSelect(found);
+              }
+            }}
+            className="bg-zinc-800/80 border border-zinc-700/80 rounded-xl px-3 py-1.5 text-xs text-gray-200 font-medium outline-none focus:border-purple-600 transition-colors cursor-pointer"
           >
-            <MessageSquare className="w-3.5 h-3.5" />
-            Auto Orchestration
-          </button>
-          <button
-            onClick={() => setShowServiceSelector(!showServiceSelector)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-              selectedService || showServiceSelector ? 'bg-purple-700 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            Scanner Mode
-          </button>
+            <option value="auto">⚡ Auto Orchestration (All Agents)</option>
+            {SERVICES.map(s => (
+              <option key={s.id} value={s.id}>{s.icon} {s.label}</option>
+            ))}
+          </select>
         </div>
 
-        {selectedService && (
-          <div className="flex items-center gap-2 bg-zinc-800/60 border border-zinc-700/60 rounded-lg px-3 py-1.5">
+        {selectedService ? (
+          <div className="flex items-center gap-2 bg-purple-900/30 border border-purple-700/40 rounded-xl px-3 py-1 text-xs">
             <span className="text-sm">{selectedService.icon}</span>
-            <span className="text-xs font-medium text-gray-300">{selectedService.label}</span>
-            <button onClick={clearService} className="text-zinc-500 hover:text-zinc-300 ml-1 text-xs">✕</button>
+            <span className="font-semibold text-purple-300">{selectedService.label}</span>
+            <button onClick={clearService} className="text-zinc-400 hover:text-zinc-200 ml-1 text-xs font-bold">✕</button>
           </div>
-        )}
-
-        {!selectedService && (
-          <span className="text-xs text-zinc-500">
-            CORE automatically classifies your input and routes it to the right agents
+        ) : (
+          <span className="text-xs text-zinc-500 hidden sm:inline font-mono">
+            Auto Orchestration Mode
           </span>
         )}
       </div>

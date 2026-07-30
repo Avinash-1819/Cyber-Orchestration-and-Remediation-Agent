@@ -1,6 +1,7 @@
 """
 Sentinel AI — Reports Endpoint
-GET /reports/{session_id}/{format} — download PDF/Markdown/JSON report
+GET /reports/agent-docs/{agent_id}/pdf — download agent PDF manual
+GET /reports/{session_id}/{format} — download session PDF/Markdown/JSON report
 """
 import os
 from pathlib import Path
@@ -25,6 +26,50 @@ FORMAT_MAP = {
     "json": ("report.json", "application/json"),
 }
 
+AGENT_PDF_MAP = {
+    "triage": "01_Incident_Triage_Agent_Documentation.pdf",
+    "remediation": "02_Remediation_Agent_Documentation.pdf",
+    "devsecops": "03_DevSecOps_Agent_Documentation.pdf",
+    "compliance": "04_Compliance_Agent_Documentation.pdf",
+    "threat_intel": "05_Threat_Intel_Agent_Documentation.pdf",
+    "exec_reporting": "06_Exec_Reporting_Agent_Documentation.pdf",
+}
+
+@router.get("/agent-docs/{agent_id}/pdf")
+async def download_agent_pdf(agent_id: str):
+    """Download separate PDF documentation for a specific sub-agent."""
+    if agent_id not in AGENT_PDF_MAP:
+        raise HTTPException(status_code=400, detail=f"Invalid agent_id. Choose from: {list(AGENT_PDF_MAP.keys())}")
+    
+    filename = AGENT_PDF_MAP[agent_id]
+    possible_paths = [
+        Path("/app/data/agent_docs/pdf") / filename,
+        Path("/app/docs/agents/pdf") / filename,
+        Path(__file__).parents[4] / "docs" / "agents" / "pdf" / filename,
+        Path(__file__).parents[2] / "data" / "agent_docs" / "pdf" / filename,
+    ]
+    pdf_path = None
+    for p in possible_paths:
+        if p.exists():
+            pdf_path = p
+            break
+            
+    if not pdf_path:
+        from app.services.agent_docs import ensure_all_agent_pdfs_generated
+        ensure_all_agent_pdfs_generated()
+        for p in possible_paths:
+            if p.exists():
+                pdf_path = p
+                break
+
+    if not pdf_path:
+        raise HTTPException(status_code=404, detail="Agent documentation PDF not found.")
+
+    return FileResponse(
+        path=str(pdf_path),
+        filename=filename,
+        media_type="application/pdf"
+    )
 
 @router.get("/{session_id}/{format}")
 async def download_report(
@@ -52,7 +97,7 @@ async def download_report(
     file_path = Path(settings.REPORTS_OUTPUT_DIR) / session_id / filename
 
     if not file_path.exists():
-        raise HTTPException(status_code=404, detail=f"Report file not found. The scan may have failed.")
+        raise HTTPException(status_code=404, detail="Report file not found. The scan may have failed.")
 
     # Audit log the download
     audit = AuditLogRepository(db)
