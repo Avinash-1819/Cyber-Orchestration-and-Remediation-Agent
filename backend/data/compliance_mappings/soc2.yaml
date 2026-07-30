@@ -1,0 +1,70 @@
+# SOC 2 Type II (Trust Services Criteria) — Finding Category to Control ID Mapping
+# Version: 2017-2023
+
+version: "2017-2023"
+framework: "SOC2"
+
+mappings:
+  "Secrets":
+    control_id: "CC6.1"
+    control_name: "Logical and Physical Access Controls — Registered Devices"
+    secondary:
+      - "CC6.3"   # Remove access when no longer required
+
+  "OWASP-A01":
+    control_id: "CC7.1"
+    control_name: "System Operations — Detecting and Monitoring Anomalies"
+    secondary:
+      - "CC8.1"   # Change Management
+
+  "OWASP-A02":
+    control_id: "CC6.7"
+    control_name: "Transmission of Confidential Information"
+    secondary:
+      - "CC6.1"   # Access Controls
+
+  "OWASP-A03":
+    control_id: "CC7.2"
+    control_name: "Monitoring for Security Events"
+    secondary:
+      - "CC8.1"   # Change Management
+
+  "OWASP-A05":
+    control_id: "CC7.1"
+    control_name: "System Operations"
+    secondary:
+      - "CC6.8"   # Prevention and Detection of Unauthorized Software
+
+  "OWASP-A06":
+    control_id: "CC7.1"
+    control_name: "System Operations"
+    secondary:
+      - "CC9.1"   # Risk Mitigation Activities
+
+  "OWASP-A07":
+    control_id: "CC6.1"
+    control_name: "Logical and Physical Access Controls"
+    secondary:
+      - "CC6.2"   # Authentication Management
+
+  "IaC-Misconfiguration":
+    control_id: "CC7.1"
+    control_name: "System Operations"
+    secondary:
+      - "CC6.8"   # Unauthorized Software
+
+  "Incident":
+    control_id: "CC7.3"
+    control_name: "Evaluating Security Events"
+    secondary:
+      - "CC7.4"   # Responding to Security Incidents
+
+  "CVE":
+    control_id: "CC7.1"
+    control_name: "System Operations — Monitoring"
+    secondary:
+      - "CC9.1"   # Risk Mitigation
+
+  "Remediation":
+    control_id: "CC7.5"
+    control_name: "Remediation Identified Deficiencies"

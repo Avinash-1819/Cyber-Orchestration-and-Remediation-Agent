@@ -1,0 +1,96 @@
+# === Secrets & Config ===
+.env
+*.env.local
+*.env.production
+secrets/
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# === Virtual Environments ===
+.env/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# === Database ===
+*.db
+*.sqlite
+*.sqlite3
+
+# === Reports (generated artifacts) ===
+backend/data/reports/
+!backend/data/reports/.gitkeep
+
+# === Cloned repos (ephemeral scan targets) ===
+backend/data/scan_tmp/
+
+# === MITRE data (large, downloaded at build time) ===
+backend/data/mitre/enterprise-attack.json
+
+# === Node / Frontend ===
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.local
+
+# === OS ===
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# === IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === Docker ===
+.dockerenv
+
+# === Logs ===
+logs/
+*.log

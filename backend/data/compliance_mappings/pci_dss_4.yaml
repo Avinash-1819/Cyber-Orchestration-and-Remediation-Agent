@@ -1,0 +1,71 @@
+# PCI DSS 4.0 — Finding Category to Control ID Mapping
+# Version: 4.0-2022
+
+version: "4.0-2022"
+framework: "PCI_DSS_4"
+
+mappings:
+  "Secrets":
+    control_id: "Req-3.5"
+    control_name: "Primary Account Number (PAN) secured with strong cryptography"
+    secondary:
+      - "Req-8.2"  # User ID management
+      - "Req-8.3"  # Authentication factors
+
+  "OWASP-A01":
+    control_id: "Req-6.2"
+    control_name: "Bespoke and custom software are developed securely"
+    secondary:
+      - "Req-6.3"  # Security vulnerabilities identified and addressed
+
+  "OWASP-A02":
+    control_id: "Req-3.5"
+    control_name: "PAN secured with strong cryptography"
+    secondary:
+      - "Req-4.2"  # PAN protected with strong cryptography during transmission
+
+  "OWASP-A03":
+    control_id: "Req-6.2"
+    control_name: "Bespoke and custom software developed securely"
+    secondary:
+      - "Req-6.4"  # Public-facing web applications protected against attacks
+
+  "OWASP-A05":
+    control_id: "Req-2.2"
+    control_name: "System components configured and managed securely"
+    secondary:
+      - "Req-2.3"  # Wireless environments configured and managed securely
+
+  "OWASP-A06":
+    control_id: "Req-6.3"
+    control_name: "Security vulnerabilities are identified and addressed"
+    secondary:
+      - "Req-11.3"  # External and internal vulnerabilities managed
+
+  "OWASP-A07":
+    control_id: "Req-8.2"
+    control_name: "User identification and related accounts managed"
+    secondary:
+      - "Req-8.3"  # User authentication managed
+
+  "IaC-Misconfiguration":
+    control_id: "Req-2.2"
+    control_name: "System components configured securely"
+
+  "Incident":
+    control_id: "Req-12.10"
+    control_name: "Suspected and confirmed security incidents responded to immediately"
+    secondary:
+      - "Req-12.10.1"  # Incident response plan maintained
+
+  "CVE":
+    control_id: "Req-6.3"
+    control_name: "Security vulnerabilities identified and addressed"
+    secondary:
+      - "Req-11.3"  # Penetration testing
+
+  "Remediation":
+    control_id: "Req-12.10"
+    control_name: "Incident Response"
+    secondary:
+      - "Req-6.3"  # Vulnerability remediation

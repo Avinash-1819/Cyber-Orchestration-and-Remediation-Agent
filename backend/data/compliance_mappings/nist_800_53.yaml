@@ -1,0 +1,82 @@
+# NIST SP 800-53 Rev 5 — Finding Category to Control ID Mapping
+# Version: Rev5-2023
+
+version: "Rev5-2023"
+framework: "NIST_800_53"
+
+mappings:
+  "Secrets":
+    control_id: "IA-5"
+    control_name: "Authenticator Management"
+    secondary:
+      - "SC-28"   # Protection of Information at Rest
+      - "SA-15"   # Development Process, Standards, and Tools
+
+  "OWASP-A01":
+    control_id: "SI-10"
+    control_name: "Information Input Validation"
+    secondary:
+      - "SI-3"    # Malicious Code Protection
+      - "SA-11"   # Developer Testing and Evaluation
+
+  "OWASP-A02":
+    control_id: "SC-28"
+    control_name: "Protection of Information at Rest"
+    secondary:
+      - "SC-8"    # Transmission Confidentiality and Integrity
+
+  "OWASP-A03":
+    control_id: "SI-10"
+    control_name: "Information Input Validation"
+    secondary:
+      - "SA-15"   # Development Process, Standards, and Tools
+
+  "OWASP-A05":
+    control_id: "CM-6"
+    control_name: "Configuration Settings"
+    secondary:
+      - "CM-2"    # Baseline Configuration
+      - "CM-7"    # Least Functionality
+
+  "OWASP-A06":
+    control_id: "SI-2"
+    control_name: "Flaw Remediation"
+    secondary:
+      - "SA-22"   # Unsupported System Components
+
+  "OWASP-A07":
+    control_id: "IA-2"
+    control_name: "Identification and Authentication"
+    secondary:
+      - "AC-3"    # Access Enforcement
+
+  "IaC-Misconfiguration":
+    control_id: "CM-6"
+    control_name: "Configuration Settings"
+    secondary:
+      - "CM-2"    # Baseline Configuration
+
+  "Dockerfile":
+    control_id: "CM-7"
+    control_name: "Least Functionality"
+    secondary:
+      - "CM-6"    # Configuration Settings
+
+  "Incident":
+    control_id: "IR-4"
+    control_name: "Incident Handling"
+    secondary:
+      - "IR-5"    # Incident Monitoring
+      - "IR-6"    # Incident Reporting
+
+  "CVE":
+    control_id: "SI-2"
+    control_name: "Flaw Remediation"
+    secondary:
+      - "RA-5"    # Vulnerability Monitoring and Scanning
+
+  "Remediation":
+    control_id: "IR-4"
+    control_name: "Incident Handling"
+    secondary:
+      - "CA-7"    # Continuous Monitoring
