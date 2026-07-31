@@ -3,25 +3,38 @@ import { Shield, MessageSquare, History, LogOut, Zap, ChevronDown, Check, Layout
 import { useState } from 'react';
 
 const SCANNER_OPTIONS = [
-  { id: 'auto', icon: '⚡', label: 'Auto Orchestration', desc: 'All Agents — Auto Classifier' },
-  { id: 'sast', icon: '🛡️', label: 'SAST Code Scanner', desc: 'DevSecOpsAgent' },
-  { id: 'docker', icon: '🐳', label: 'Dockerfile Auditor', desc: 'DevSecOpsAgent' },
-  { id: 'iac', icon: '🏗️', label: 'Terraform / IaC Analyzer', desc: 'DevSecOps + Compliance' },
-  { id: 'triage', icon: '📊', label: 'Incident Triage Engine', desc: 'Triage + Remediation' },
-  { id: 'enricher', icon: '🔍', label: 'Threat Enricher', desc: 'Triage + ThreatIntel' },
-  { id: 'compliance', icon: '📜', label: 'GRC Compliance Mapper', desc: 'Compliance + ExecReport' },
-  { id: 'cve', icon: '🎯', label: 'CVE & ATT&CK Intel', desc: 'ThreatIntelAgent' },
-  { id: 'report', icon: '📄', label: 'Executive PDF Report', desc: 'All Core Agents' },
+  { id: 'auto', icon: '⚡', label: 'Auto Orchestration', desc: 'Auto Classifier picks the pipeline', agents: [
+    'IncidentTriageAgent', 'IOCEnrichmentAgent', 'LogCorrelationAgent', 'ForensicsAgent',
+    'RemediationAgent', 'DevSecOpsAgent', 'CloudSecurityAgent', 'NetworkSecurityAgent',
+    'ComplianceAgent', 'ThreatIntelAgent', 'RiskScoringAgent', 'ExecReportingAgent',
+  ] },
+  { id: 'sast', icon: '🛡️', label: 'SAST Code Scanner', desc: 'Source code static analysis', agents: ['DevSecOpsAgent'] },
+  { id: 'docker', icon: '🐳', label: 'Dockerfile Auditor', desc: 'Container image hardening', agents: ['DevSecOpsAgent', 'CloudSecurityAgent'] },
+  { id: 'iac', icon: '🏗️', label: 'Terraform / IaC Analyzer', desc: 'Infrastructure misconfiguration audit', agents: ['DevSecOpsAgent', 'CloudSecurityAgent', 'ComplianceAgent'] },
+  { id: 'network', icon: '📡', label: 'Network Exposure Analyzer', desc: 'Open ports & attack surface', agents: ['NetworkSecurityAgent', 'RiskScoringAgent', 'ExecReportingAgent'] },
+  { id: 'triage', icon: '📊', label: 'Incident Triage Engine', desc: 'Full incident investigation', agents: ['IncidentTriageAgent', 'IOCEnrichmentAgent', 'LogCorrelationAgent', 'ForensicsAgent', 'RemediationAgent'] },
+  { id: 'enricher', icon: '🔍', label: 'Threat Enricher', desc: 'IOC + threat intelligence lookup', agents: ['IncidentTriageAgent', 'IOCEnrichmentAgent', 'ThreatIntelAgent'] },
+  { id: 'compliance', icon: '📜', label: 'GRC Compliance Mapper', desc: 'ISO 27001 / SOC 2 / PCI DSS / NIST', agents: ['DevSecOpsAgent', 'CloudSecurityAgent', 'ComplianceAgent', 'ExecReportingAgent'] },
+  { id: 'cve', icon: '🎯', label: 'CVE & ATT&CK Intel', desc: 'Vulnerability intel & detection', agents: ['ThreatIntelAgent', 'RiskScoringAgent', 'ExecReportingAgent'] },
+  { id: 'report', icon: '📄', label: 'Executive PDF Report', desc: 'Full pipeline + executive reporting', agents: ['IncidentTriageAgent', 'DevSecOpsAgent', 'ThreatIntelAgent', 'RiskScoringAgent', 'ExecReportingAgent'] },
 ];
 
 const ALL_SUB_AGENTS = [
   { id: 'IncidentTriageAgent', name: 'Incident Triage', icon: '🔍' },
+  { id: 'IOCEnrichmentAgent', name: 'IOC Enrichment', icon: '🌐' },
+  { id: 'LogCorrelationAgent', name: 'Log Correlation', icon: '📡' },
+  { id: 'ForensicsAgent', name: 'Forensics', icon: '🧪' },
   { id: 'RemediationAgent', name: 'Remediation', icon: '⚡' },
   { id: 'DevSecOpsAgent', name: 'DevSecOps', icon: '🛡️' },
+  { id: 'CloudSecurityAgent', name: 'Cloud Security', icon: '☁️' },
+  { id: 'NetworkSecurityAgent', name: 'Network Security', icon: '🌐' },
   { id: 'ComplianceAgent', name: 'Compliance', icon: '📋' },
   { id: 'ThreatIntelAgent', name: 'Threat Intel', icon: '🧠' },
+  { id: 'RiskScoringAgent', name: 'Risk Scoring', icon: '📈' },
   { id: 'ExecReportingAgent', name: 'Exec Reporting', icon: '📊' },
 ];
+
+const agentName = (id: string) => ALL_SUB_AGENTS.find(a => a.id === id)?.name || id.replace('Agent', '');
 
 export default function CoreLayout() {
   const navigate = useNavigate();
@@ -34,10 +47,16 @@ export default function CoreLayout() {
     } catch {}
     return {
       IncidentTriageAgent: true,
+      IOCEnrichmentAgent: true,
+      LogCorrelationAgent: true,
+      ForensicsAgent: true,
       RemediationAgent: true,
       DevSecOpsAgent: true,
+      CloudSecurityAgent: true,
+      NetworkSecurityAgent: true,
       ComplianceAgent: true,
       ThreatIntelAgent: true,
+      RiskScoringAgent: true,
       ExecReportingAgent: true,
     };
   });
@@ -151,6 +170,13 @@ export default function CoreLayout() {
                       <div className="flex-1 min-w-0">
                         <div className="text-xs leading-snug">{opt.label}</div>
                         <div className="text-[10px] text-zinc-500 truncate">{opt.desc}</div>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {opt.agents.map(ag => (
+                            <span key={ag} className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800/80 border border-zinc-700/60 text-zinc-400">
+                              {agentName(ag)}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                       {opt.id === currentScannerId && <Check className="w-3.5 h-3.5 text-purple-400 shrink-0 mt-0.5" />}
                     </button>
@@ -168,7 +194,7 @@ export default function CoreLayout() {
                 ENABLE AGENTS
               </span>
               <span className="text-[9px] text-purple-400">
-                {Object.values(enabledAgents).filter(Boolean).length}/6 Active
+                {Object.values(enabledAgents).filter(Boolean).length}/12 Active
               </span>
             </div>
 

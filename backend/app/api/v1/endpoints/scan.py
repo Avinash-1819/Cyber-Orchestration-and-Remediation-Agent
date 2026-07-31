@@ -84,6 +84,14 @@ async def _run_and_persist(
             selected_agents=selected_agents,
             mode=mode,
         )
+        try:
+            from app.services.report_engine import generate_all_reports
+            paths = generate_all_reports(final_state)
+            final_state.report_pdf_path = paths.get("pdf")
+            final_state.report_markdown_path = paths.get("markdown")
+            final_state.report_json_path = paths.get("json")
+        except Exception as report_err:
+            log.warning("background_report_gen_failed", session_id=session_id, error=str(report_err))
     except Exception as e:
         log.exception("pipeline_background_error", session_id=session_id)
         final_state = initial_state

@@ -8,14 +8,14 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  token: localStorage.getItem('token'),
+  token: localStorage.getItem('core_token'),
   user: null,
   setAuth: (token, user) => {
-    localStorage.setItem('token', token);
+    localStorage.setItem('core_token', token);
     set({ token, user });
   },
   logout: () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem('core_token');
     set({ token: null, user: null });
   },
 }));

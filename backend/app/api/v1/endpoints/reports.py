@@ -33,6 +33,12 @@ AGENT_PDF_MAP = {
     "compliance": "04_Compliance_Agent_Documentation.pdf",
     "threat_intel": "05_Threat_Intel_Agent_Documentation.pdf",
     "exec_reporting": "06_Exec_Reporting_Agent_Documentation.pdf",
+    "ioc_enrichment": "07_IOC_Enrichment_Agent_Documentation.pdf",
+    "log_correlation": "08_Log_Correlation_Agent_Documentation.pdf",
+    "forensics": "09_Forensics_Agent_Documentation.pdf",
+    "cloud_security": "10_Cloud_Security_Agent_Documentation.pdf",
+    "network_security": "11_Network_Security_Agent_Documentation.pdf",
+    "risk_scoring": "12_Risk_Scoring_Agent_Documentation.pdf",
 }
 
 @router.get("/agent-docs/{agent_id}/pdf")

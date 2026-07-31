@@ -4,9 +4,7 @@ import {
   Send, Square, Shield, Zap, CheckCircle, XCircle, Clock, Download, Loader2,
   Bug, ChevronDown, ChevronUp, LayoutGrid
 } from 'lucide-react';
-
-const API = 'http://localhost:8000/api/v1';
-const WS_BASE = 'ws://localhost:8000/api/v1';
+import { API_BASE, wsUrl } from '@/services/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -58,7 +56,7 @@ const SERVICES = [
     icon: '🐳',
     label: 'Dockerfile Auditor',
     desc: 'Detect privileged containers, latest tags, secret leaks in Dockerfiles',
-    agents: ['DevSecOpsAgent'],
+    agents: ['DevSecOpsAgent', 'CloudSecurityAgent'],
     hint: 'CODE',
     color: 'cyan',
     example: 'FROM ubuntu:latest\nRUN apt-get install ...',
@@ -68,17 +66,27 @@ const SERVICES = [
     icon: '🏗️',
     label: 'Terraform / IaC Analyzer',
     desc: 'Detect IAM misconfigs, open security groups, public S3 buckets',
-    agents: ['DevSecOpsAgent', 'ComplianceAgent'],
+    agents: ['DevSecOpsAgent', 'CloudSecurityAgent', 'ComplianceAgent'],
     hint: 'CODE',
     color: 'amber',
     example: 'resource "aws_security_group" "allow_all" { ... }',
+  },
+  {
+    id: 'network',
+    icon: '📡',
+    label: 'Network Exposure Analyzer',
+    desc: 'Analyze open ports, firewall rules, and attack surface',
+    agents: ['NetworkSecurityAgent', 'RiskScoringAgent', 'ExecReportingAgent'],
+    hint: 'NETWORK',
+    color: 'teal',
+    example: 'Host: 203.0.113.10\nOpen ports: 22/tcp ssh, 3389/tcp rdp, 445/tcp smb',
   },
   {
     id: 'triage',
     icon: '📊',
     label: 'Incident Triage Engine',
     desc: 'Classify logs, extract IOCs, enrich via VirusTotal/Shodan',
-    agents: ['IncidentTriageAgent', 'RemediationAgent'],
+    agents: ['IncidentTriageAgent', 'IOCEnrichmentAgent', 'LogCorrelationAgent', 'ForensicsAgent', 'RemediationAgent'],
     hint: 'LOGS',
     color: 'red',
     example: 'Jul 29 14:33 sshd: Failed password for root from 185.220.101.47',
@@ -88,7 +96,7 @@ const SERVICES = [
     icon: '🔍',
     label: 'Threat Enricher',
     desc: 'Enrich IPs, domains, hashes via VirusTotal & Shodan',
-    agents: ['IncidentTriageAgent', 'ThreatIntelAgent'],
+    agents: ['IncidentTriageAgent', 'IOCEnrichmentAgent', 'ThreatIntelAgent'],
     hint: 'IOC',
     color: 'purple',
     example: '185.220.101.47\nmalware.example.com\nabc123def...',
@@ -98,7 +106,7 @@ const SERVICES = [
     icon: '📜',
     label: 'GRC Compliance Mapper',
     desc: 'Map findings to ISO 27001, SOC 2, NIST SP 800-53, PCI DSS 4.0',
-    agents: ['ComplianceAgent', 'ExecReportingAgent'],
+    agents: ['DevSecOpsAgent', 'CloudSecurityAgent', 'ComplianceAgent', 'ExecReportingAgent'],
     hint: 'CODE',
     color: 'green',
     example: 'Paste code or infrastructure config for compliance audit...',
@@ -108,7 +116,7 @@ const SERVICES = [
     icon: '🎯',
     label: 'CVE & ATT&CK Intelligence',
     desc: 'Live NVD CVE lookup, MITRE ATT&CK mapping, Sigma/YARA rules',
-    agents: ['ThreatIntelAgent'],
+    agents: ['ThreatIntelAgent', 'RiskScoringAgent', 'ExecReportingAgent'],
     hint: 'CVE',
     color: 'orange',
     example: 'CVE-2024-3400\nCVE-2023-44487',
@@ -118,7 +126,7 @@ const SERVICES = [
     icon: '📄',
     label: 'Executive PDF Report',
     desc: 'Generate full PDF/Markdown/JSON security report from any input',
-    agents: ['IncidentTriageAgent', 'DevSecOpsAgent', 'ThreatIntelAgent', 'ExecReportingAgent'],
+    agents: ['IncidentTriageAgent', 'DevSecOpsAgent', 'ThreatIntelAgent', 'RiskScoringAgent', 'ExecReportingAgent'],
     hint: 'MIXED',
     color: 'violet',
     example: 'Paste any security data for full executive reporting...',
@@ -127,24 +135,32 @@ const SERVICES = [
 
 const ALL_AGENTS = [
   { name: 'IncidentTriageAgent', icon: '🔍', label: 'Incident Triage' },
+  { name: 'IOCEnrichmentAgent', icon: '🌐', label: 'IOC Enrichment' },
+  { name: 'LogCorrelationAgent', icon: '📡', label: 'Log Correlation' },
+  { name: 'ForensicsAgent', icon: '🧪', label: 'Forensics' },
   { name: 'RemediationAgent', icon: '⚡', label: 'Remediation' },
   { name: 'DevSecOpsAgent', icon: '🛡️', label: 'DevSecOps' },
+  { name: 'CloudSecurityAgent', icon: '☁️', label: 'Cloud Security' },
+  { name: 'NetworkSecurityAgent', icon: '🌐', label: 'Network Security' },
   { name: 'ComplianceAgent', icon: '📋', label: 'Compliance' },
   { name: 'ThreatIntelAgent', icon: '🧠', label: 'Threat Intel' },
+  { name: 'RiskScoringAgent', icon: '📈', label: 'Risk Scoring' },
   { name: 'ExecReportingAgent', icon: '📊', label: 'Exec Report' },
 ];
 
 const PIPELINE_AGENTS: Record<string, string[]> = {
-  A: ['DevSecOpsAgent', 'ComplianceAgent', 'ExecReportingAgent'],
-  B: ['IncidentTriageAgent', 'RemediationAgent', 'ThreatIntelAgent', 'ExecReportingAgent'],
-  C: ['ThreatIntelAgent', 'ExecReportingAgent'],
-  A_THEN_B: ['DevSecOpsAgent', 'ComplianceAgent', 'IncidentTriageAgent', 'RemediationAgent', 'ThreatIntelAgent', 'ExecReportingAgent'],
+  A: ['DevSecOpsAgent', 'CloudSecurityAgent', 'ComplianceAgent', 'RiskScoringAgent', 'ExecReportingAgent'],
+  B: ['IncidentTriageAgent', 'IOCEnrichmentAgent', 'LogCorrelationAgent', 'ForensicsAgent', 'RemediationAgent', 'ThreatIntelAgent', 'RiskScoringAgent', 'ExecReportingAgent'],
+  C: ['ThreatIntelAgent', 'RiskScoringAgent', 'ExecReportingAgent'],
+  D: ['NetworkSecurityAgent', 'RiskScoringAgent', 'ExecReportingAgent'],
+  A_THEN_B: ['DevSecOpsAgent', 'CloudSecurityAgent', 'ComplianceAgent', 'IncidentTriageAgent', 'IOCEnrichmentAgent', 'LogCorrelationAgent', 'ForensicsAgent', 'RemediationAgent', 'ThreatIntelAgent', 'RiskScoringAgent', 'ExecReportingAgent'],
   CUSTOM: [],
 };
 
 const COLOR_MAP: Record<string, string> = {
   blue: 'border-blue-600/40 bg-blue-900/10 hover:bg-blue-900/20',
   cyan: 'border-cyan-600/40 bg-cyan-900/10 hover:bg-cyan-900/20',
+  teal: 'border-teal-600/40 bg-teal-900/10 hover:bg-teal-900/20',
   amber: 'border-amber-600/40 bg-amber-900/10 hover:bg-amber-900/20',
   red: 'border-red-600/40 bg-red-900/10 hover:bg-red-900/20',
   purple: 'border-purple-600/40 bg-purple-900/10 hover:bg-purple-900/20',
@@ -219,7 +235,7 @@ function MessageBubble({ msg, token }: { msg: Message; token: string | null }) {
 
   const downloadReport = (format: string) => {
     if (!msg.sessionId || !token) return;
-    fetch(`${API}/reports/${msg.sessionId}/${format}`, { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${API_BASE}/reports/${msg.sessionId}/${format}`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.blob()).then(blob => {
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -472,11 +488,11 @@ How can I help you today? You can ask me general cybersecurity questions, or pas
     if (!forceRefresh && token) return token;
     try {
       localStorage.removeItem('core_token');
-      await fetch(`${API}/auth/local/register`, {
+      await fetch(`${API_BASE}/auth/local/register`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: 'core_admin', password: 'core_pass_2024!' })
       });
-      const res = await fetch(`${API}/auth/local/login`, {
+      const res = await fetch(`${API_BASE}/auth/local/login`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: 'core_admin', password: 'core_pass_2024!' })
       });
@@ -506,8 +522,8 @@ How can I help you today? You can ask me general cybersecurity questions, or pas
       // Poll up to 6 times (max 3.6s) to ensure background DB commit completes
       while (attempts < 6) {
         const [stateRes, findingsRes] = await Promise.all([
-          fetch(`${API}/sessions/${sid}`, { headers: { Authorization: `Bearer ${tk}` } }),
-          fetch(`${API}/incidents/${sid}/findings`, { headers: { Authorization: `Bearer ${tk}` } }),
+          fetch(`${API_BASE}/sessions/${sid}`, { headers: { Authorization: `Bearer ${tk}` } }),
+          fetch(`${API_BASE}/incidents/${sid}/findings`, { headers: { Authorization: `Bearer ${tk}` } }),
         ]);
         state = stateRes.ok ? await stateRes.json() : null;
         const findingsData = findingsRes.ok ? await findingsRes.json() : null;
@@ -530,10 +546,11 @@ How can I help you today? You can ask me general cybersecurity questions, or pas
       const es = s.executive_summary || {};
 
       let content = '';
-      if (es.overview) content += es.overview + '\n\n';
+      if (es.executive_narrative) content += es.executive_narrative + '\n\n';
       else if (s.threat_intel_report?.threat_summary) content += s.threat_intel_report.threat_summary + '\n\n';
       else if (s.triage_report?.executive_one_liner) content += s.triage_report.executive_one_liner + '\n\n';
       else if (s.code_audit_report?.audit_summary) content += s.code_audit_report.audit_summary + '\n\n';
+      else if (s.executive_summary?.executive_headline) content += s.executive_summary.executive_headline + '\n\n';
 
       const crit = findings.filter((f: any) => f.severity === 'CRITICAL').length;
       const high = findings.filter((f: any) => f.severity === 'HIGH').length;
@@ -547,8 +564,12 @@ How can I help you today? You can ask me general cybersecurity questions, or pas
         content += '✅ **Analysis completed.**';
       }
 
-      if (es.recommendations?.length) {
-        content += '\n\n**Top Recommendations:**\n' + es.recommendations.slice(0, 3).map((r: string) => `→ ${r}`).join('\n');
+      if (es.risk_posture) {
+        content += `\n\n**Overall Risk Posture:** ${es.risk_posture}`;
+      }
+
+      if (es.key_recommendations?.length) {
+        content += '\n\n**Top Recommendations:**\n' + es.key_recommendations.slice(0, 3).map((r: string) => `→ ${r}`).join('\n');
       }
 
       updateMessage(aiId, { status: 'done', content, findings });
@@ -609,7 +630,7 @@ How can I help you today? You can ask me general cybersecurity questions, or pas
         body.mode = 'auto';
       }
 
-      let res = await fetch(`${API}/scan`, {
+      let res = await fetch(`${API_BASE}/scan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk}` },
         body: JSON.stringify(body),
@@ -619,7 +640,7 @@ How can I help you today? You can ask me general cybersecurity questions, or pas
       if (res.status === 401) {
         tk = await getToken(true);
         if (tk) {
-          res = await fetch(`${API}/scan`, {
+          res = await fetch(`${API_BASE}/scan`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk}` },
             body: JSON.stringify(body),
@@ -638,10 +659,11 @@ How can I help you today? You can ask me general cybersecurity questions, or pas
 
       const scanData = await res.json();
       const sid = scanData.session_id;
+      if (!tk) throw new Error('Could not authenticate with backend. Is it running?');
       updateMessage(aiId, { sessionId: sid, status: 'streaming' });
 
       // Connect WebSocket
-      const ws = new WebSocket(`${WS_BASE}/ws/${sid}?token=${tk}`);
+      const ws = new WebSocket(wsUrl(sid, tk));
       wsRef.current = ws;
       let agentNames: string[] = [];
       let finalFetched = false;
@@ -703,7 +725,7 @@ How can I help you today? You can ask me general cybersecurity questions, or pas
     } catch (err: any) {
       updateMessage(aiId, {
         status: 'error',
-        content: `❌ **Error:** ${String(err?.message || err)}\n\nPlease verify backend is running at \`http://localhost:8000\``,
+        content: `❌ **Error:** ${String(err?.message || err)}\n\nPlease verify backend is running.`,
       });
       setIsRunning(false);
     }
@@ -741,41 +763,52 @@ How can I help you today? You can ask me general cybersecurity questions, or pas
     <div className="flex flex-col h-full">
       {/* Mode toggle header */}
       <div className="border-b border-zinc-800/60 bg-[#0d0d14]/80 px-4 py-2.5 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <label className="text-xs font-mono text-zinc-400 shrink-0 flex items-center gap-1.5">
-            <LayoutGrid className="w-3.5 h-3.5 text-purple-400" />
-            Scanner Mode:
-          </label>
-          <select
-            value={selectedService?.id || 'auto'}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val === 'auto') {
-                clearService();
-              } else {
-                const found = SERVICES.find(s => s.id === val);
-                if (found) handleServiceSelect(found);
-              }
-            }}
-            className="bg-zinc-800/80 border border-zinc-700/80 rounded-xl px-3 py-1.5 text-xs text-gray-200 font-medium outline-none focus:border-purple-600 transition-colors cursor-pointer"
-          >
-            <option value="auto">⚡ Auto Orchestration (All Agents)</option>
-            {SERVICES.map(s => (
-              <option key={s.id} value={s.id}>{s.icon} {s.label}</option>
-            ))}
-          </select>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-3">
+            <label className="text-xs font-mono text-zinc-400 shrink-0 flex items-center gap-1.5">
+              <LayoutGrid className="w-3.5 h-3.5 text-purple-400" />
+              Scanner Mode:
+            </label>
+            <select
+              value={selectedService?.id || 'auto'}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === 'auto') {
+                  clearService();
+                } else {
+                  const found = SERVICES.find(s => s.id === val);
+                  if (found) handleServiceSelect(found);
+                }
+              }}
+              className="bg-zinc-800/80 border border-zinc-700/80 rounded-xl px-3 py-1.5 text-xs text-gray-200 font-medium outline-none focus:border-purple-600 transition-colors cursor-pointer"
+            >
+              <option value="auto">⚡ Auto Orchestration (All Agents)</option>
+              {SERVICES.map(s => (
+                <option key={s.id} value={s.id}>{s.icon} {s.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {selectedService && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {selectedService.agents.map(agName => {
+                const ag = ALL_AGENTS.find(a => a.name === agName);
+                return (
+                  <span key={agName} className="text-[10px] px-2 py-0.5 rounded-full bg-purple-900/40 border border-purple-700/50 text-purple-200 font-mono">
+                    {ag?.icon} {ag?.label || agName}
+                  </span>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {selectedService ? (
+        {selectedService && (
           <div className="flex items-center gap-2 bg-purple-900/30 border border-purple-700/40 rounded-xl px-3 py-1 text-xs">
             <span className="text-sm">{selectedService.icon}</span>
             <span className="font-semibold text-purple-300">{selectedService.label}</span>
             <button onClick={clearService} className="text-zinc-400 hover:text-zinc-200 ml-1 text-xs font-bold">✕</button>
           </div>
-        ) : (
-          <span className="text-xs text-zinc-500 hidden sm:inline font-mono">
-            Auto Orchestration Mode
-          </span>
         )}
       </div>
 

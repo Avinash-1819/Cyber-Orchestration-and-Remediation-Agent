@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from app.agents.base_agent import BaseAgent
 from app.agents.state import Finding, SentinelState
 from app.core.exceptions import AgentError
+from app.services.engines import exec_report_engine
 from app.services.llm_client import MODEL_PRO
 from app.services.report_engine import generate_all_reports
 
@@ -124,6 +125,10 @@ PRODUCE:
 
 If findings are minimal, be honest about the positive security posture — don't inflate risk."""
 
+        def _deterministic_exec() -> ExecutiveSummarySchema:
+            data = exec_report_engine.analyze_exec_report(state.model_dump(mode="json"))
+            return ExecutiveSummarySchema(**data)
+
         try:
             exec_summary = await self.llm.generate_structured(
                 prompt=prompt,
@@ -131,6 +136,7 @@ If findings are minimal, be honest about the positive security posture — don't
                 model_role=MODEL_PRO,  # Pro model for nuanced business synthesis
                 agent_name=self.AGENT_NAME,
                 temperature=0.2,
+                fallback_factory=_deterministic_exec,
             )
         except Exception as e:
             raise AgentError(self.AGENT_NAME, f"Executive summary generation failed: {e}") from e

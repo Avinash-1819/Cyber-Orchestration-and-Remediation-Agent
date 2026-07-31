@@ -1,20 +1,21 @@
 import AgentNode from './AgentNode';
 
 interface Props {
-  pipelineType: 'A' | 'B' | 'C';
+  pipelineType: 'A' | 'B' | 'C' | 'D';
   activeAgent: string | null;
   completedAgents: string[];
   errorAgent: string | null;
 }
 
-const pipelines = {
-  A: ['MasterOrchestrator', 'DevSecOpsAgent', 'ComplianceAgent', 'ExecReportingAgent'],
-  B: ['MasterOrchestrator', 'IncidentTriageAgent', 'RemediationAgent', 'ThreatIntelAgent', 'ExecReportingAgent'],
-  C: ['MasterOrchestrator', 'ThreatIntelAgent', 'ExecReportingAgent']
+const pipelines: Record<string, string[]> = {
+  A: ['MasterOrchestrator', 'DevSecOpsAgent', 'CloudSecurityAgent', 'ComplianceAgent', 'RiskScoringAgent', 'ExecReportingAgent'],
+  B: ['MasterOrchestrator', 'IncidentTriageAgent', 'IOCEnrichmentAgent', 'LogCorrelationAgent', 'ForensicsAgent', 'RemediationAgent', 'ThreatIntelAgent', 'RiskScoringAgent', 'ExecReportingAgent'],
+  C: ['MasterOrchestrator', 'ThreatIntelAgent', 'RiskScoringAgent', 'ExecReportingAgent'],
+  D: ['MasterOrchestrator', 'NetworkSecurityAgent', 'RiskScoringAgent', 'ExecReportingAgent'],
 };
 
 export default function PipelineTimeline({ pipelineType, activeAgent, completedAgents, errorAgent }: Props) {
-  const agents = pipelines[pipelineType] || pipelines.A;
+  const agents = pipelines[pipelineType] || pipelines.B;
 
   return (
     <div id="pipeline-timeline" className="glass-panel p-10 relative overflow-hidden">

@@ -1,16 +1,30 @@
 import axios from 'axios';
 
+const API_BASE = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000/api/v1';
+
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api/v1',
+  baseURL: API_BASE,
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('core_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (res) => res,
+  (err) => Promise.reject(err)
+);
+
+export { API_BASE };
+
+export function wsUrl(sessionId: string, token: string): string {
+  const base = API_BASE.replace(/^http/, 'ws');
+  return `${base}/ws/${sessionId}?token=${token}`;
+}
 
 export const auth = {
   localLogin: (data: any) => api.post('/auth/local/login', data),

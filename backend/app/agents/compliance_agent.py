@@ -17,6 +17,7 @@ from app.agents.base_agent import BaseAgent
 from app.agents.state import Finding, SentinelState
 from app.core.config import settings
 from app.core.exceptions import AgentError
+from app.services.engines import compliance_engine
 from app.services.llm_client import MODEL_PRO
 
 log = structlog.get_logger(__name__)
@@ -126,6 +127,14 @@ Calculate an overall compliance score (0-100) where:
 
 Produce an auditor evidence checklist of specific artifacts an auditor would need."""
 
+        def _deterministic_compliance() -> ComplianceAnalysisSchema:
+            findings_dict = [
+                {"id": f.id, "severity": f.severity, "category": f.category, "title": f.title}
+                for f in state.findings
+            ]
+            data = compliance_engine.analyze_compliance(findings_dict)
+            return ComplianceAnalysisSchema(**data)
+
         try:
             compliance = await self.llm.generate_structured(
                 prompt=prompt,
@@ -133,6 +142,7 @@ Produce an auditor evidence checklist of specific artifacts an auditor would nee
                 model_role=MODEL_PRO,  # Use Pro for deep GRC reasoning
                 agent_name=self.AGENT_NAME,
                 temperature=0.1,
+                fallback_factory=_deterministic_compliance,
             )
         except Exception as e:
             raise AgentError(self.AGENT_NAME, f"Compliance analysis failed: {e}") from e

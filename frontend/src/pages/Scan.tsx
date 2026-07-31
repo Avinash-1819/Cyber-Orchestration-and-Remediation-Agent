@@ -4,6 +4,7 @@ import { Send, Terminal, AlertCircle, CheckCircle2, HelpCircle } from 'lucide-re
 import PipelineTimeline from '@/components/pipeline-timeline/PipelineTimeline';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/store/auth';
+import { API_BASE, wsUrl } from '@/services/api';
 
 interface ScanEvent {
   type: string;
@@ -83,7 +84,7 @@ export default function Scan() {
   const [activeAgent, setActiveAgent] = useState<string | null>(null);
   const [completedAgents, setCompletedAgents] = useState<string[]>([]);
   const [errorAgent, setErrorAgent] = useState<string | null>(null);
-  const [pipelineType, setPipelineType] = useState<'A' | 'B' | 'C'>('A');
+  const [pipelineType, setPipelineType] = useState<'A' | 'B' | 'C' | 'D'>('A');
   const [scanStatus, setScanStatus] = useState<string>('idle');
   const [clarificationQuestion, setClarificationQuestion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -103,8 +104,7 @@ export default function Scan() {
 
   const connectWebSocket = useCallback((sid: string) => {
     if (!token) return;
-    const wsUrl = `${import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8000'}/api/v1/ws/${sid}?token=${token}`;
-    const ws = new WebSocket(wsUrl);
+    const ws = new WebSocket(wsUrl(sid, token));
     wsRef.current = ws;
 
     ws.onopen = () => addEvent({ type: 'system', event: 'WebSocket connected — streaming live updates' });
@@ -130,6 +130,7 @@ export default function Scan() {
             break;
           case 'classified':
             if (event.pipeline === 'A' || event.pipeline === 'A_THEN_B') setPipelineType('A');
+            else if (event.pipeline === 'D') setPipelineType('D');
             else if (event.pipeline === 'C') setPipelineType('C');
             else setPipelineType('B');
             break;
@@ -139,6 +140,7 @@ export default function Scan() {
             break;
           case 'state_snapshot':
             if (event.pipeline === 'A' || event.pipeline === 'A_THEN_B') setPipelineType('A');
+            else if (event.pipeline === 'D') setPipelineType('D');
             else if (event.pipeline === 'C') setPipelineType('C');
             break;
         }
@@ -168,13 +170,12 @@ export default function Scan() {
   const ensureAuth = useCallback(async () => {
     if (token) return token;
     try {
-      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
-      await fetch(`${apiBase}/auth/local/register`, {
+      await fetch(`${API_BASE}/auth/local/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: 'secops_admin', password: 'password123' })
       });
-      const res = await fetch(`${apiBase}/auth/local/login`, {
+      const res = await fetch(`${API_BASE}/auth/local/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: 'secops_admin', password: 'password123' })
@@ -214,7 +215,7 @@ export default function Scan() {
     setScanStatus('running');
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/scan`, {
+      const res = await fetch(`${API_BASE}/scan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({ input: input.trim(), input_type_hint: inputTypeHint || undefined }),
@@ -319,6 +320,7 @@ export default function Scan() {
             <option value="REPO_URL">GitHub Repository URL</option>
             <option value="CVE">CVE ID / Vulnerability</option>
             <option value="IOC">Incident IOCs</option>
+            <option value="NETWORK">Network Exposure / Ports</option>
           </select>
           <button
             id="scan-submit-btn"
