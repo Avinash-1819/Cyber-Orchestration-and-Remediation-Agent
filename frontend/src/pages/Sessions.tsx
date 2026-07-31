@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Clock, CheckCircle, Loader2, AlertTriangle, ChevronRight, Search } from 'lucide-react';
-
-const API = 'http://localhost:8000/api/v1';
+import { sessions as sessionsApi } from '@/services/api';
 
 function statusIcon(status: string) {
   if (status === 'completed') return <CheckCircle className="w-4 h-4 text-emerald-400" />;
@@ -20,9 +19,11 @@ export default function Sessions() {
   useEffect(() => {
     const tk = localStorage.getItem('core_token');
     if (!tk) { setLoading(false); return; }
-    fetch(`${API}/sessions?limit=50`, { headers: { Authorization: `Bearer ${tk}` } })
-      .then(r => r.ok ? r.json() : { sessions: [] })
-      .then(d => { setSessions(d.sessions || []); setLoading(false); })
+    sessionsApi.getAll()
+      .then(d => {
+        setSessions(Array.isArray(d) ? d : (d.sessions || []));
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, []);
 

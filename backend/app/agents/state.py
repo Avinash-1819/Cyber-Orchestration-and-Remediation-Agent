@@ -56,6 +56,14 @@ class SentinelState(BaseModel):
     threat_intel_report: Optional[Dict[str, Any]] = None
     executive_summary: Optional[Dict[str, Any]] = None
 
+    # New 12-Agent Architecture Outputs
+    ioc_enrichment_report: Optional[Dict[str, Any]] = None
+    log_correlation_report: Optional[Dict[str, Any]] = None
+    forensics_report: Optional[Dict[str, Any]] = None
+    cloud_security_report: Optional[Dict[str, Any]] = None
+    network_security_report: Optional[Dict[str, Any]] = None
+    risk_report: Optional[Dict[str, Any]] = None
+
     # Execution trace — append-only, never mutate or delete entries
     execution_trace: List[ExecutionTraceEntry] = Field(default_factory=list)
     current_agent: Optional[str] = None

@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from app.agents.base_agent import BaseAgent
 from app.agents.state import Finding, SentinelState
 from app.core.exceptions import AgentError
+from app.services.engines import threat_intel_engine
 from app.services.external_intel import get_cve, search_mitre_techniques
 from app.services.llm_client import MODEL_FLASH
 
@@ -143,12 +144,26 @@ PRODUCE:
 For detection rules, be specific to the threat — generic rules add no value."""
 
         try:
+            def _deterministic_intel() -> ThreatIntelSchema:
+                ioc_summary = [
+                    {"value": i.value, "type": i.type} for i in state.extracted_iocs
+                ]
+                incident = {
+                    "attack_pattern": state.triage_report.get("attack_pattern", "") if state.triage_report else "",
+                    "severity": state.triage_report.get("severity", "") if state.triage_report else "",
+                }
+                data = threat_intel_engine.analyze_threat_intel(
+                    cve_data_map, mitre_techniques, ioc_summary, incident
+                )
+                return ThreatIntelSchema(**data)
+
             intel = await self.llm.generate_structured(
                 prompt=prompt,
                 output_schema=ThreatIntelSchema,
                 model_role=MODEL_FLASH,
                 agent_name=self.AGENT_NAME,
                 temperature=0.1,
+                fallback_factory=_deterministic_intel,
             )
         except Exception as e:
             raise AgentError(self.AGENT_NAME, f"Threat intel LLM analysis failed: {e}") from e

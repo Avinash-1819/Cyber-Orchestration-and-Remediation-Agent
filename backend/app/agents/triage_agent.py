@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from app.agents.base_agent import BaseAgent
 from app.agents.state import Finding, IndicatorOfCompromise, SentinelState
 from app.core.exceptions import AgentError
+from app.services.engines import triage_engine
 from app.services.external_intel import enrich_ioc_virustotal, enrich_ip_shodan
 from app.services.llm_client import MODEL_FLASH
 
@@ -132,6 +133,15 @@ class TriageAgent(BaseAgent):
         # 4. LLM triage analysis (with Grafify token minimization)
         compressed_input = grafify_compress_logs(state.raw_input[:10000])
 
+        ioc_summary = [
+            {"value": ioc.value, "type": ioc.type}
+            for ioc in state.extracted_iocs
+        ]
+
+        def _deterministic_triage() -> TriageAnalysisSchema:
+            data = triage_engine.analyze_triage(state.raw_input, ioc_summary)
+            return TriageAnalysisSchema(**data)
+
         prompt = f"""You are a senior threat analyst performing incident triage. 
 Analyze the following security log/event data and extracted IOCs to determine if this is a True Positive or False Positive security incident.
 
@@ -151,6 +161,7 @@ Be precise and evidence-based. If the log shows no real threat indicators, class
                 model_role=MODEL_FLASH,
                 agent_name=self.AGENT_NAME,
                 temperature=0.1,
+                fallback_factory=_deterministic_triage,
             )
         except Exception as e:
             raise AgentError(self.AGENT_NAME, f"LLM triage analysis failed: {e}") from e

@@ -1,6 +1,6 @@
 """
 Sentinel AI — Agent Documentation Generator Service
-Generates technical PDF manuals for all 6 sub-agents on app startup.
+Generates technical PDF manuals for all 12 sub-agents on app startup.
 """
 import os
 import structlog
@@ -169,6 +169,148 @@ ENHANCED_AGENT_DOCS = [
                 "CRITICAL Risk: Assigned if >= 1 Critical finding or active breach detected.",
                 "HIGH Risk: Assigned if >= 1 High severity vulnerability or unpatched CVE exists.",
                 "MEDIUM / LOW Risk: Assigned for non-critical hardening recommendations."
+            ])
+        ]
+    },
+    {
+        "filename": "07_IOC_Enrichment_Agent_Documentation.pdf",
+        "title": "IOC Enrichment Agent (Agent 7)",
+        "subtitle": "Deep Technical Specification & Operational Manual",
+        "overview": "The IOC Enrichment Agent takes raw indicators of compromise extracted by triage and enriches them against external threat intelligence platforms (VirusTotal, Shodan) and local deterministic reputation heuristics, producing a consolidated, risk-weighted IOC registry.",
+        "sections": [
+            ("1. Architectural Overview & Workflow", [
+                "Position in LangGraph Engine: Second node in Pipeline B, executing directly after IncidentTriageAgent.",
+                "Input Consumption: Consumes state.extracted_iocs (IPs, domains, hashes, URLs).",
+                "State Propagation: Writes state.ioc_enrichment_report and updates findings with per-IOC reputation context.",
+                "Graceful Degradation: Never fails the pipeline when external APIs are unreachable; deterministic heuristics fill the gap."
+            ]),
+            ("2. Multi-Source Enrichment Layer", [
+                "VirusTotal API v3: Reputation votes (malicious/suspicious/harmless), country attribution, and tags per IOC.",
+                "Shodan REST API: Open-port inventory, ISP, hostnames, and known vulnerabilities for exposed IPs.",
+                "Local Deterministic Heuristics: Private-range classification, reserved multicast/loopback detection, hash format validation, and static reputation scoring."
+            ]),
+            ("3. Risk-Weighted IOC Registry", [
+                "Threat Score: Each IOC receives a normalized 0-100 risk score combining external votes and local heuristics.",
+                "Confidence Labeling: IOCs are labeled MALICIOUS, SUSPICIOUS, or BENIGN with evidence from each contributing source.",
+                "Deduplication: Consolidates repeated indicators while preserving first-seen/last-seen provenance."
+            ]),
+            ("4. Output Schema & Downstream Handoff", [
+                "IOCEnrichmentReport: Contains enriched_iocs list, threat_summary, and overall threat_score.",
+                "Downstream Consumption: LogCorrelationAgent and ForensicsAgent consume enriched IOC context for behavioral correlation."
+            ])
+        ]
+    },
+    {
+        "filename": "08_Log_Correlation_Agent_Documentation.pdf",
+        "title": "Log Correlation Agent (Agent 8)",
+        "subtitle": "Deep Technical Specification & Operational Manual",
+        "overview": "The Log Correlation Agent performs deterministic time-series correlation across firewall, IDS/IPS, authentication, and endpoint event streams to detect multi-stage attack chains that individual log entries would miss.",
+        "sections": [
+            ("1. Architectural Overview & Workflow", [
+                "Position in LangGraph Engine: Third node in Pipeline B, executing after IOCEnrichmentAgent.",
+                "Input Consumption: Consumes raw log payloads, enriched IOCs, and triage context.",
+                "State Propagation: Writes state.log_correlation_report with correlated event clusters and attack-chain hypotheses."
+            ]),
+            ("2. Deterministic Correlation Engine", [
+                "Source IP Clustering: Groups events sharing a source address within a configurable time window.",
+                "Port/Service Chaining: Maps sequential port-scan to service-access to privilege-escalation patterns.",
+                "Authentication Failure Counting: Flags brute-force attempts exceeding deterministic thresholds (e.g., >5 failures/minute).",
+                "Temporal Window Analysis: Only events inside the correlation window are chained, preventing false-positive merging."
+            ]),
+            ("3. Attack-Chain Hypothesis Generation", [
+                "Chain Reconstruction: Each correlated cluster produces a human-readable hypothesis of the likely attack flow.",
+                "Confidence Scoring: Chain confidence reflects evidence volume and consistency across independent log sources.",
+                "Alert Fatigue Reduction: Correlated clusters are surfaced once with full evidence rather than as disjointed alerts."
+            ])
+        ]
+    },
+    {
+        "filename": "09_Forensics_Agent_Documentation.pdf",
+        "title": "Digital Forensics Agent (Agent 9)",
+        "subtitle": "Deep Technical Specification & Operational Manual",
+        "overview": "The Forensics Agent conducts deterministic evidence extraction and artifact analysis over the incident data, identifying persistence mechanisms, timelining suspicious activity, and mapping attack artifacts to MITRE ATT&CK techniques.",
+        "sections": [
+            ("1. Architectural Overview & Workflow", [
+                "Position in LangGraph Engine: Fourth node in Pipeline B, executing after LogCorrelationAgent.",
+                "Input Consumption: Consumes correlated event clusters, enriched IOCs, and raw payloads.",
+                "State Propagation: Writes state.forensics_report with evidence artifacts, timeline, and persistence findings."
+            ]),
+            ("2. Artifact & Persistence Analysis", [
+                "Persistence Pattern Detection: Startup keys, cron entries, scheduled tasks, and registry autorun references.",
+                "Process/Service Artifacts: Suspicious binaries, unusual child-process chains, and service registration anomalies.",
+                "File-Hash Attribution: Links discovered hashes to known-bad reputation from the enrichment layer."
+            ]),
+            ("3. Incident Timeline Reconstruction", [
+                "Chronological Evidence Ledger: Every artifact is stamped with its first-seen event reference.",
+                "Kill-Chain Positioning: Each artifact is mapped to a MITRE ATT&CK tactic for analyst navigation.",
+                "Chain-of-Custody Fields: Evidence entries include source log reference and detection method for auditability."
+            ])
+        ]
+    },
+    {
+        "filename": "10_Cloud_Security_Agent_Documentation.pdf",
+        "title": "Cloud Security Agent (Agent 10)",
+        "subtitle": "Deep Technical Specification & Operational Manual",
+        "overview": "The Cloud Security Agent performs deterministic auditing of infrastructure-as-code (Terraform, CloudFormation), container configurations (Docker), and cloud service posture to detect misconfigurations, exposed secrets, and privilege escalations across AWS, Azure, and GCP.",
+        "sections": [
+            ("1. Architectural Overview & Workflow", [
+                "Position in LangGraph Engine: Second node in Pipeline A, executing after DevSecOpsAgent.",
+                "Input Consumption: Consumes code audit findings (including secret-redacted file snippets) and raw IaC payloads.",
+                "State Propagation: Writes state.cloud_security_report with per-service misconfiguration findings."
+            ]),
+            ("2. IaC Misconfiguration Detection", [
+                "Terraform/CloudFormation: Detects public S3 buckets, overly permissive security groups (0.0.0.0/0), unencrypted volumes, and IAM wildcard privileges.",
+                "Docker Security Posture: Flags root execution, unversioned base images, missing healthchecks, and sensitive env passthrough.",
+                "Service Posture: Checks AWS/GCP/Azure managed-service settings embedded in configuration code."
+            ]),
+            ("3. Deterministic Risk Assignment", [
+                "CIS Benchmark Alignment: Findings reference aligned CIS benchmark controls.",
+                "Severity Classification: CRITICAL/HIGH/MEDIUM/LOW based on exploitability and blast radius.",
+                "Remediation Guidance: Every finding ships with a concrete configuration fix snippet."
+            ])
+        ]
+    },
+    {
+        "filename": "11_Network_Security_Agent_Documentation.pdf",
+        "title": "Network Security Agent (Agent 11)",
+        "subtitle": "Deep Technical Specification & Operational Manual",
+        "overview": "The Network Security Agent performs deterministic analysis of network topology data, firewall rule sets, open-port inventories, and exposure lists to identify attack surface, lateral movement paths, and risky perimeter configurations.",
+        "sections": [
+            ("1. Architectural Overview & Workflow", [
+                "Position in LangGraph Engine: Sole analysis node in Pipeline D (Network Exposure).",
+                "Input Consumption: Accepts nmap-style output, IP:port inventories, firewall rules, and topology descriptions.",
+                "State Propagation: Writes state.network_security_report and appends exposure findings."
+            ]),
+            ("2. Exposure & Attack-Surface Analysis", [
+                "Open-Port Risk Scoring: Ranks exposed services (e.g., 22/SSH, 3389/RDP, 445/SMB, 1433/MSSQL) by exploitation likelihood.",
+                "Firewall Rule Review: Flags default-deny violations, wildcard source ranges, and management-plane exposure.",
+                "Lateral-Movement Paths: Identifies host pairs where a compromise on one node directly reaches another."
+            ]),
+            ("3. Deterministic Segmentation & Hardening Output", [
+                "Segmentation Recommendations: Produces allow-list and network-tier suggestions derived from observed flows.",
+                "Findings Enrichment: Each exposure finding includes severity, affected asset, and concrete hardening step."
+            ])
+        ]
+    },
+    {
+        "filename": "12_Risk_Scoring_Agent_Documentation.pdf",
+        "title": "Risk Scoring Agent (Agent 12)",
+        "subtitle": "Deep Technical Specification & Operational Manual",
+        "overview": "The Risk Scoring Agent consolidates all downstream agent outputs into a normalized, deterministic risk posture: per-asset risk scores, an overall session risk rating, and a ranked remediation priority queue.",
+        "sections": [
+            ("1. Architectural Overview & Workflow", [
+                "Position in LangGraph Engine: Penultimate node in Pipelines A, B, A_THEN_B, and D, immediately before ExecReportingAgent.",
+                "Input Consumption: Consumes triage, remediation, threat intel, compliance, cloud, network, and forensics reports.",
+                "State Propagation: Writes state.risk_report with scores, rating, and priority queue."
+            ]),
+            ("2. Deterministic Scoring Methodology", [
+                "Per-Asset Risk Score: Weighted combination of finding severities, CVSS bands, and exposure context.",
+                "Overall Session Rating: Derived from worst-case asset score and critical-finding count.",
+                "Remediation Priority Queue: Orders remediation actions by risk delta per unit of effort (business impact weighting)."
+            ]),
+            ("3. Transparency & Reproducibility", [
+                "Score Breakdown: Every numeric score includes its contributing factors so analysts can audit the math.",
+                "No ML, No Black Boxes: Scoring is a fully deterministic rule set — reproducible across runs."
             ])
         ]
     }

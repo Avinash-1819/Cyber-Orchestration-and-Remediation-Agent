@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from app.agents.base_agent import BaseAgent
 from app.agents.state import Finding, SentinelState
 from app.core.exceptions import AgentError
+from app.services.engines import code_audit_engine
 from app.services.external_intel import cleanup_temp_dir, clone_github_repo
 from app.services.llm_client import MODEL_FLASH
 from app.services.grafify import grafify_compress_code
@@ -144,6 +145,16 @@ class DevSecOpsAgent(BaseAgent):
                 ))
         return findings
 
+    def _redacted_snippets(self, files: List[Tuple[str, str]]) -> List[Dict[str, str]]:
+        """Return capped, secret-redacted file snippets for downstream agents."""
+        snippets = []
+        for file_path, content in files[:10]:
+            redacted = content[:3000]
+            for pattern, _ in SECRET_PATTERNS:
+                redacted = pattern.sub("***REDACTED***", redacted)
+            snippets.append({"path": file_path, "content": redacted})
+        return snippets
+
     async def execute(self, state: SentinelState) -> SentinelState:
         """Run SAST and IaC analysis on code or GitHub repo."""
         temp_dir: Optional[str] = None
@@ -200,6 +211,10 @@ For each finding, provide:
 CODE TO ANALYZE:
 {code_context}"""
 
+            def _deterministic_audit() -> CodeAuditSchema:
+                data = code_audit_engine.analyze_code_audit(files)
+                return CodeAuditSchema(**data)
+
             try:
                 audit = await self.llm.generate_structured(
                     prompt=prompt,
@@ -207,6 +222,7 @@ CODE TO ANALYZE:
                     model_role=MODEL_FLASH,
                     agent_name=self.AGENT_NAME,
                     temperature=0.1,
+                    fallback_factory=_deterministic_audit,
                 )
             except Exception as e:
                 raise AgentError(self.AGENT_NAME, f"SAST analysis failed: {e}") from e
@@ -233,6 +249,9 @@ CODE TO ANALYZE:
                 "secrets_findings_count": len(secret_findings),
                 "files_scanned": len(files),
                 "findings_detail": [f.model_dump() for f in audit.findings],
+                # Redacted snippets so downstream agents (Cloud/Network) can analyze the
+                # actual IaC/code without re-cloning. Secrets are NEVER persisted.
+                "file_snippets": self._redacted_snippets(files),
             }
 
             self._trace(state, "sast_complete", {

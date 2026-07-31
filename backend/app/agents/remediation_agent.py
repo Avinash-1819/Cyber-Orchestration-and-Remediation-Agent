@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from app.agents.base_agent import BaseAgent
 from app.agents.state import Finding, SentinelState
 from app.core.exceptions import AgentError
+from app.services.engines import remediation_engine
 from app.services.llm_client import MODEL_FLASH
 
 log = structlog.get_logger(__name__)
@@ -90,6 +91,14 @@ REQUIREMENTS:
 
 IMPORTANT: The backend will ONLY display these commands — it will NEVER execute them. Mark destructive=true conservatively."""
 
+        def _deterministic_playbook() -> RemediationPlaybook:
+            ioc_summary = [
+                {"value": ioc.get("value"), "type": ioc.get("type")}
+                for ioc in triage.get("iocs_enriched", [])
+            ]
+            data = remediation_engine.analyze_remediation(triage, ioc_summary, [])
+            return RemediationPlaybook(**data)
+
         try:
             playbook = await self.llm.generate_structured(
                 prompt=prompt,
@@ -97,6 +106,7 @@ IMPORTANT: The backend will ONLY display these commands — it will NEVER execut
                 model_role=MODEL_FLASH,
                 agent_name=self.AGENT_NAME,
                 temperature=0.1,
+                fallback_factory=_deterministic_playbook,
             )
         except Exception as e:
             raise AgentError(self.AGENT_NAME, f"Playbook generation failed: {e}") from e

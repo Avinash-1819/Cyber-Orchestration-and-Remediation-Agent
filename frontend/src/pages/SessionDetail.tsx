@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Download, CheckCircle, Loader2 } from 'lucide-react';
-
-const API = 'http://localhost:8000/api/v1';
+import { API_BASE } from '@/services/api';
 
 function SeverityBadge({ sev }: { sev: string }) {
   const map: Record<string, string> = {
@@ -25,8 +24,8 @@ export default function SessionDetail() {
     if (!tk) { setLoading(false); return; }
 
     Promise.all([
-      fetch(`${API}/sessions/${id}`, { headers: { Authorization: `Bearer ${tk}` } }).then(r => r.ok ? r.json() : null),
-      fetch(`${API}/incidents/${id}/findings`, { headers: { Authorization: `Bearer ${tk}` } }).then(r => r.ok ? r.json() : { findings: [] }),
+      fetch(`${API_BASE}/sessions/${id}`, { headers: { Authorization: `Bearer ${tk}` } }).then(r => r.ok ? r.json() : null),
+      fetch(`${API_BASE}/incidents/${id}/findings`, { headers: { Authorization: `Bearer ${tk}` } }).then(r => r.ok ? r.json() : { findings: [] }),
     ]).then(([s, f]) => {
       setSession(s);
       setFindings(f?.findings || []);
@@ -37,7 +36,7 @@ export default function SessionDetail() {
   const download = (fmt: string) => {
     const tk = localStorage.getItem('core_token');
     if (!tk) return;
-    fetch(`${API}/reports/${id}/${fmt}`, { headers: { Authorization: `Bearer ${tk}` } })
+    fetch(`${API_BASE}/reports/${id}/${fmt}`, { headers: { Authorization: `Bearer ${tk}` } })
       .then(r => r.blob())
       .then(blob => {
         const a = document.createElement('a');
@@ -153,28 +152,40 @@ export default function SessionDetail() {
 
             {/* Summary tab */}
             {activeTab === 'summary' && (
-              <div className="glass border border-zinc-700/40 rounded-xl p-5">
+              <div className="glass border border-zinc-700/40 rounded-xl p-5 space-y-4">
                 {Object.keys(execSummary).length === 0 ? (
                   <p className="text-zinc-500 text-sm">No executive summary available yet.</p>
                 ) : (
-                  <div className="space-y-4">
-                    {execSummary.overview && (
+                  <>
+                    {execSummary.executive_headline && (
+                      <div>
+                        <h3 className="text-sm font-semibold text-zinc-300 mb-1">Headline</h3>
+                        <p className="text-sm text-zinc-100 leading-relaxed font-medium">{execSummary.executive_headline}</p>
+                      </div>
+                    )}
+                    {execSummary.executive_narrative && (
                       <div>
                         <h3 className="text-sm font-semibold text-zinc-300 mb-1">Overview</h3>
-                        <p className="text-sm text-zinc-400 leading-relaxed">{execSummary.overview}</p>
+                        <p className="text-sm text-zinc-400 leading-relaxed">{execSummary.executive_narrative}</p>
                       </div>
                     )}
-                    {execSummary.risk_level && (
+                    {execSummary.risk_posture && (
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-zinc-500">Risk Level:</span>
-                        <SeverityBadge sev={execSummary.risk_level} />
+                        <SeverityBadge sev={execSummary.risk_posture} />
                       </div>
                     )}
-                    {execSummary.recommendations?.length > 0 && (
+                    {execSummary.business_impact_summary && (
+                      <div>
+                        <h3 className="text-sm font-semibold text-zinc-300 mb-1">Business Impact</h3>
+                        <p className="text-sm text-zinc-400 leading-relaxed">{execSummary.business_impact_summary}</p>
+                      </div>
+                    )}
+                    {execSummary.key_recommendations?.length > 0 && (
                       <div>
                         <h3 className="text-sm font-semibold text-zinc-300 mb-2">Top Recommendations</h3>
                         <ul className="space-y-1">
-                          {execSummary.recommendations.map((r: string, i: number) => (
+                          {execSummary.key_recommendations.map((r: string, i: number) => (
                             <li key={i} className="flex items-start gap-2 text-sm text-zinc-400">
                               <span className="text-purple-400 shrink-0 mt-0.5">→</span>{r}
                             </li>
@@ -182,7 +193,31 @@ export default function SessionDetail() {
                         </ul>
                       </div>
                     )}
-                  </div>
+                    {execSummary.immediate_actions_required?.length > 0 && (
+                      <div>
+                        <h3 className="text-sm font-semibold text-zinc-300 mb-2">Immediate Actions (24-48h)</h3>
+                        <ul className="space-y-1">
+                          {execSummary.immediate_actions_required.map((r: string, i: number) => (
+                            <li key={i} className="flex items-start gap-2 text-sm text-zinc-400">
+                              <span className="text-amber-400 shrink-0 mt-0.5">⚡</span>{r}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {execSummary.estimated_remediation_effort && (
+                      <div>
+                        <h3 className="text-sm font-semibold text-zinc-300 mb-1">Remediation Effort</h3>
+                        <p className="text-sm text-zinc-400 leading-relaxed">{execSummary.estimated_remediation_effort}</p>
+                      </div>
+                    )}
+                    {execSummary.regulatory_exposure && (
+                      <div>
+                        <h3 className="text-sm font-semibold text-zinc-300 mb-1">Regulatory Exposure</h3>
+                        <p className="text-sm text-zinc-400 leading-relaxed">{execSummary.regulatory_exposure}</p>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}

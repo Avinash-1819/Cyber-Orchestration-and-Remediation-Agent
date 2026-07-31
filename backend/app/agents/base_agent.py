@@ -142,8 +142,9 @@ class BaseAgent(ABC):
     def _trace(self, state: SentinelState, event: str, details: Optional[Dict[str, Any]] = None) -> None:
         """Convenience method for mid-execution trace entries."""
         state.append_trace(agent=self.AGENT_NAME, event=event, details=details or {})
-        asyncio.get_event_loop().call_soon_threadsafe(
-            lambda: asyncio.ensure_future(
+        try:
+            loop = asyncio.get_running_loop()
+            task = loop.create_task(
                 _broadcast_state_update(state.session_id, {
                     "type": "trace",
                     "agent": self.AGENT_NAME,
@@ -151,4 +152,7 @@ class BaseAgent(ABC):
                     "details": details or {},
                 })
             )
-        )
+            task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+        except RuntimeError:
+            # No running event loop (e.g. sync test context) — trace already recorded.
+            pass
